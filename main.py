@@ -32,11 +32,18 @@ def main():
 
     try:
         if not (args.partitions or args.sector is not None or args.cluster is not None or args.identify_sector is not None or args.identify_cluster is not None):
-            print("======================================================")
-            print(" NTFSForParser v1.0.0 - Framework Educativo Forense")
-            print(" Creado por: Max Bendinelli")
-            print("======================================================")
-            print(f"[+] Cargando fuente de datos: {image_path}")
+            banner = r"""
+    _   __________________  ______          ____                           
+   / | / /_  __/ ____/ __ \/ ____/___  ____/ __ \____ ______________  _____
+  /  |/ / / / / /_  / /_/ / /_  / __ \/ __/ /_/ / __ `/ ___/ ___/ _ \/ ___/
+ / /|  / / / / __/ / _, _/ __/ / /_/ / / / ____/ /_/ / /  (__  )  __/ /    
+/_/ |_/ /_/ /_/   /_/ |_/_/    \____/_/ /_/    \__,_/_/  /____/\___/_/     
+            """
+            print(banner)
+            print("==========================================================================")
+            print(" v1.0.0 - Framework Educativo de Informática Forense | Por: Max Bendinelli")
+            print("==========================================================================")
+            print(f"\n[+] Cargando fuente de datos: {image_path}")
             
         # 1. Determinar tipo de fuente de datos
         if re.search(r'\.[0-9]{3}$', image_path.lower()):
