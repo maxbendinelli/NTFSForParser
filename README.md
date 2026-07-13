@@ -1,5 +1,10 @@
 # 🕵️‍♂️ NTFSForParser - Framework Forense Educativo
 
+<div align="center">
+  <img src="assets/logo.png" alt="NTFSForParser Logo" width="400"/>
+</div>
+
+
 **NTFSForParser** es un framework interactivo desarrollado en Python, diseñado con un enfoque netamente **educativo y pedagógico**. Su objetivo es permitir a los estudiantes de informática forense sumergirse en las profundidades de los sistemas de archivos, entendiendo las estructuras de bajo nivel (hexadecimal), metadatos, y técnicas de recuperación sin depender de interfaces gráficas complejas o cajas negras.
 
 Actualmente soporta análisis profundo sobre particiones **FAT32** y **NTFS**, e inspección base para **Ext4** (Linux), procesando tanto imágenes crudas (`.dd`, `.raw`, fragmentadas `.001`) como imágenes adquiridas en formato **EnCase (`.e01`)**.
