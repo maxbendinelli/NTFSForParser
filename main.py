@@ -32,9 +32,10 @@ def main():
 
     try:
         if not (args.partitions or args.sector is not None or args.cluster is not None or args.identify_sector is not None or args.identify_cluster is not None):
-            print("========================================")
-            print(" NTFSForParser - Framework Educativo ")
-            print("========================================")
+            print("======================================================")
+            print(" NTFSForParser v1.0.0 - Framework Educativo Forense")
+            print(" Creado por: Max Bendinelli")
+            print("======================================================")
             print(f"[+] Cargando fuente de datos: {image_path}")
             
         # 1. Determinar tipo de fuente de datos
