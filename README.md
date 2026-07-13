@@ -92,4 +92,12 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 
 ---
 
+## 🗺️ Roadmap (Próximas Funcionalidades)
+
+- **Verificación Completa E01**: Hacer que el comando `hash_check` lea y compare automáticamente los hashes almacenados en los contenedores EnCase (.e01) contra el md5 físico de la imagen en caliente.
+- **File Carving Automatizado**: Implementar un módulo para extraer y recuperar de forma ciega archivos eliminados (PDFs, JPGs, ZIPs) rastreando *Magic Bytes* en los clústeres no asignados del disco.
+- **Expansión de Idiomas (i18n)**: Continuar la traducción del 100% de los subsistemas y parsers de bajo nivel al motor de diccionarios multi-idioma (Inglés/Español).
+
+---
+
 > *Desarrollado para entornos académicos y enseñanza de análisis binario y file systems.*
