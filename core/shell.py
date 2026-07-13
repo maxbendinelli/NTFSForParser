@@ -129,39 +129,39 @@ class NTFSShell(cmd.Cmd):
         try:
             idx = int(arg)
             if idx < 0 or idx >= len(self.mbr_parser.partitions):
-                print(f"Error: Índice de partición {idx} fuera de rango.")
+                print(_("Error: Índice de partición {idx} fuera de rango.").format(idx=idx))
                 return
                 
             self.selected_partition = idx
             part = self.mbr_parser.partitions[idx]
             
-            print(f"\n[+] Partición {idx} seleccionada.")
+            print(_("\n[+] Partición {idx} seleccionada.").format(idx=idx))
             
             # Inicializar parser según el tipo
             if part.type_code == 0x07:
                 self.current_parser = NTFSParser(self.data_source, part)
                 self.current_directory_id = 5 # Root MFT ID
-                print("    Sistema de archivos detectado: NTFS")
+                print(_("    Sistema de archivos detectado: NTFS"))
             elif part.type_code in (0x0B, 0x0C):
                 self.current_parser = FATParser(self.data_source, part)
                 self.current_directory_id = self.current_parser.boot_sector.root_cluster
                 if self.current_directory_id == 0: self.current_directory_id = 2
-                print("    Sistema de archivos detectado: FAT32")
+                print(_("    Sistema de archivos detectado: FAT32"))
             elif part.type_code == 0x83:
                 self.current_parser = Ext4Parser(self.data_source, part)
                 self.current_directory_id = 2 # Inodo root de ext4
-                print("    Sistema de archivos detectado: Ext4 (Linux)")
+                print(_("    Sistema de archivos detectado: Ext4 (Linux)"))
             else:
                 self.current_parser = None
-                print("    Sistema de archivos desconocido o no soportado para parseo automático.")
+                print(_("    Sistema de archivos desconocido o no soportado para parseo automático."))
                 
             self.current_path = "/"
             self.update_prompt()
             
         except ValueError:
-            print("Uso: select <numero_de_particion>")
+            print(_("Uso: select <numero_de_particion>"))
         except Exception as e:
-            print(f"Error al inicializar el parser de la partición: {e}")
+            print(_("Error al inicializar el parser de la partición: {error}").format(error=e))
 
     def do_hexdump(self, arg):
         """Muestra un volcado hexadecimal absoluto. Uso: hexdump <offset> <longitud>"""
@@ -345,12 +345,12 @@ class NTFSShell(cmd.Cmd):
     def do_ls(self, arg):
         """Lista archivos en el directorio actual."""
         if self.selected_partition is None or self.current_parser is None:
-            print("Selecciona una partición primero.")
+            print(_("Selecciona una partición primero."))
             return
             
         if isinstance(self.current_parser, NTFSParser):
-            print(f"\n[+] Escaneando registros MFT apuntando a '{self.current_path}' (Parent ID: {self.current_directory_id})...")
-            print(f"{'ID':<8} | {'Tipo':<6} | {'Estado':<10} | {'Modificación':<20} | {'Nombre del Archivo'}")
+            print(_("\n[+] Escaneando registros MFT apuntando a '{path}' (Parent ID: {dir_id})...").format(path=self.current_path, dir_id=self.current_directory_id))
+            print(_("{id:<8} | {type:<6} | {status:<10} | {mod:<20} | {name}").format(id="ID", type="Tipo", status="Estado", mod="Modificación", name="Nombre del Archivo"))
             print("-" * 80)
             
             self.ntfs_files_cache.clear()
@@ -371,54 +371,54 @@ class NTFSShell(cmd.Cmd):
                         self.ntfs_files_cache[record.file_name.lower()] = i
                         
                         tipo = "DIR" if record.is_directory() else "FILE"
-                        estado = "Activo" if record.is_in_use() else "Borrado"
+                        estado = _("Activo") if record.is_in_use() else _("Borrado")
                         mod_date = record.modified if record.modified else "N/A"
                         
                         print(f"{i:<8} | {tipo:<6} | {estado:<10} | {mod_date:<20} | {record.file_name}")
                 except Exception:
                     pass
-            print("\n[+] Fin del escaneo.")
+            print(_("\n[+] Fin del escaneo."))
             
         elif isinstance(self.current_parser, FATParser):
-            print(f"\n[+] Leyendo directorio '{self.current_path}' (Clúster: {self.current_directory_id})...")
+            print(_("\n[+] Leyendo directorio '{path}' (Clúster: {dir_id})...").format(path=self.current_path, dir_id=self.current_directory_id))
             try:
                 self.fat_files_cache = self.current_parser.get_directory_entries(self.current_directory_id)
-                print(f"{'ID':<8} | {'Tipo':<6} | {'Estado':<10} | {'Tamaño':<10} | {'Modificación':<20} | {'Nombre'}")
+                print(_("{id:<8} | {type:<6} | {status:<10} | {size:<10} | {mod:<20} | {name}").format(id="ID", type="Tipo", status="Estado", size="Tamaño", mod="Modificación", name="Nombre"))
                 print("-" * 90)
                 for idx, entry in enumerate(self.fat_files_cache):
                     tipo = "DIR" if entry.is_directory else "FILE"
-                    estado = "Borrado" if entry.is_deleted else "Activo"
+                    estado = _("Borrado") if entry.is_deleted else _("Activo")
                     mod_date = entry.modified if entry.modified else "N/A"
                     print(f"{idx:<8} | {tipo:<6} | {estado:<10} | {entry.size:<10} | {mod_date:<20} | {entry.name}")
             except Exception as e:
-                print(f"Error al leer FAT: {e}")
+                print(_("Error al leer FAT: {error}").format(error=e))
         elif isinstance(self.current_parser, Ext4Parser):
-            print(f"\n[+] Leyendo directorio Inodo {self.current_directory_id} en Ext4...")
+            print(_("\n[+] Leyendo directorio Inodo {dir_id} en Ext4...").format(dir_id=self.current_directory_id))
             try:
                 self.ext4_files_cache = self.current_parser.get_directory_entries(self.current_directory_id)
-                print(f"{'Inodo':<10} | {'Tipo':<6} | {'Nombre'}")
+                print(_("{inode:<10} | {type:<6} | {name}").format(inode="Inodo", type="Tipo", name="Nombre"))
                 print("-" * 50)
                 for entry in self.ext4_files_cache:
                     print(f"{entry['inode']:<10} | {entry['type']:<6} | {entry['name']}")
             except Exception as e:
-                print(f"Error al leer directorio Ext4: {e}")
+                print(_("Error al leer directorio Ext4: {error}").format(error=e))
 
     def do_cd(self, arg):
         """Navega a un subdirectorio. Uso: cd <nombre> o cd .."""
         if not self.current_parser:
-            print("Selecciona una partición primero.")
+            print(_("Selecciona una partición primero."))
             return
             
         target = arg.strip()
         if not target:
-            print("Uso: cd <nombre>")
+            print(_("Uso: cd <nombre>"))
             return
             
         if target == "..":
             # Navegar hacia arriba
             if isinstance(self.current_parser, NTFSParser):
                 if self.current_directory_id == 5:
-                    print("Ya estás en el directorio raíz.")
+                    print(_("Ya estás en el directorio raíz."))
                     return
                 try:
                     record = self.current_parser.get_mft_record(self.current_directory_id)
@@ -427,7 +427,7 @@ class NTFSShell(cmd.Cmd):
                     self.current_path = "/".join(self.current_path.rstrip("/").split("/")[:-1])
                     if not self.current_path: self.current_path = "/"
                 except:
-                    print("Error al leer el directorio padre.")
+                    print(_("Error al leer el directorio padre."))
             elif isinstance(self.current_parser, FATParser):
                 for entry in self.fat_files_cache:
                     if entry.name == "..":
@@ -438,7 +438,7 @@ class NTFSShell(cmd.Cmd):
                         if not self.current_path: self.current_path = "/"
                         self.update_prompt()
                         return
-                print("No se encontró entrada '..' en este directorio.")
+                print(_("No se encontró entrada '..' en este directorio."))
                 
             elif isinstance(self.current_parser, Ext4Parser):
                 for entry in self.ext4_files_cache:
@@ -448,13 +448,13 @@ class NTFSShell(cmd.Cmd):
                         if not self.current_path: self.current_path = "/"
                         self.update_prompt()
                         return
-                print("No se encontró entrada '..' en este directorio.")
+                print(_("No se encontró entrada '..' en este directorio."))
                 
         else:
             # Navegar hacia abajo
             if isinstance(self.current_parser, NTFSParser):
                 if not self.ntfs_files_cache:
-                    print("Ejecuta 'ls' primero para indexar este directorio en la caché temporal.")
+                    print(_("Ejecuta 'ls' primero para indexar este directorio en la caché temporal."))
                     return
                     
                 target_lower = target.lower()
@@ -466,9 +466,9 @@ class NTFSShell(cmd.Cmd):
                         self.current_directory_id = mft_id
                         self.current_path = self.current_path.rstrip("/") + "/" + record.file_name
                     else:
-                        print(f"'{target}' no es un directorio.")
+                        print(_("'{target}' no es un directorio.").format(target=target))
                 else:
-                    print(f"Directorio '{target}' no encontrado (asegúrate de ejecutar 'ls' antes).")
+                    print(_("Directorio '{target}' no encontrado (asegúrate de ejecutar 'ls' antes).").format(target=target))
                     
             elif isinstance(self.current_parser, FATParser):
                 for entry in self.fat_files_cache:
@@ -481,9 +481,9 @@ class NTFSShell(cmd.Cmd):
                             self.update_prompt()
                             return
                         else:
-                            print(f"'{target}' no es un directorio.")
+                            print(_("'{target}' no es un directorio.").format(target=target))
                             return
-                print(f"Directorio '{target}' no encontrado.")
+                print(_("Directorio '{target}' no encontrado.").format(target=target))
                 
             elif isinstance(self.current_parser, Ext4Parser):
                 for entry in self.ext4_files_cache:
@@ -494,9 +494,9 @@ class NTFSShell(cmd.Cmd):
                             self.update_prompt()
                             return
                         else:
-                            print(f"'{target}' no es un directorio.")
+                            print(_("'{target}' no es un directorio.").format(target=target))
                             return
-                print(f"Directorio '{target}' no encontrado.")
+                print(_("Directorio '{target}' no encontrado.").format(target=target))
                 
         self.update_prompt()
 
@@ -665,7 +665,7 @@ class NTFSShell(cmd.Cmd):
         """Muestra el contenido de un archivo, sector o clúster. Uso: cat <id|nombre> o cat sector <num> o cat cluster <num>"""
         args = arg.split()
         if not args:
-            print("Uso: cat <id|nombre> o cat sector <num> o cat cluster <num>")
+            print(_("Uso: cat <id|nombre> o cat sector <num> o cat cluster <num>"))
             return
             
         action = args[0].lower()
@@ -673,7 +673,7 @@ class NTFSShell(cmd.Cmd):
         # 1. Cat Sector / Cluster
         if action in ("sector", "cluster"):
             if len(args) < 2:
-                print(f"Uso: cat {action} <num>")
+                print(_("Uso: cat {action} <num>").format(action=action))
                 return
             if action == "sector":
                 self.do_sector(args[1])
@@ -683,7 +683,7 @@ class NTFSShell(cmd.Cmd):
 
         # 2. Cat File by ID or Name
         if not self.current_parser:
-            print("Selecciona una partición válida primero.")
+            print(_("Selecciona una partición válida primero."))
             return
 
         file_id = None
@@ -704,7 +704,7 @@ class NTFSShell(cmd.Cmd):
             target_lower = target.lower()
             if isinstance(self.current_parser, NTFSParser):
                 if not self.ntfs_files_cache:
-                    print("Ejecuta 'ls' primero para indexar este directorio.")
+                    print(_("Ejecuta 'ls' primero para indexar este directorio."))
                     return
                 if target_lower in self.ntfs_files_cache:
                     file_id = self.ntfs_files_cache[target_lower]
@@ -715,7 +715,7 @@ class NTFSShell(cmd.Cmd):
                         break
 
         if file_id is None:
-            print(f"Archivo '{target}' no encontrado o ID numérico inválido.")
+            print(_("Archivo '{target}' no encontrado o ID numérico inválido.").format(target=target))
             return
             
         try:
@@ -735,7 +735,7 @@ class NTFSShell(cmd.Cmd):
                         break
                         
                 if not selected_stream:
-                    print(f"Flujo de datos '{stream_name}' no encontrado en el archivo.")
+                    print(_("Flujo de datos '{stream}' no encontrado en el archivo.").format(stream=stream_name))
                     return
                 
                 if selected_stream['is_resident']:
@@ -745,7 +745,7 @@ class NTFSShell(cmd.Cmd):
                     
             elif isinstance(self.current_parser, FATParser):
                 if file_id < 0 or file_id >= len(self.fat_files_cache):
-                    print("ID fuera de rango. Ejecuta 'ls' primero.")
+                    print(_("ID fuera de rango. Ejecuta 'ls' primero."))
                     return
                 entry = self.fat_files_cache[file_id]
                 file_name = entry.name
@@ -771,32 +771,32 @@ class NTFSShell(cmd.Cmd):
                             break
                             
                 if file_id is None:
-                    print("Inodo no válido o nombre no encontrado. Usa el comando 'ls' primero.")
+                    print(_("Inodo no válido o nombre no encontrado. Usa el comando 'ls' primero."))
                     return
                     
                 file_name = f"Inodo {file_id}"
                 try:
                     data_content = self.current_parser.read_file(file_id)
                 except Exception as e:
-                    print(f"Error leyendo archivo de Ext4: {e}")
+                    print(_("Error leyendo archivo de Ext4: {error}").format(error=e))
                     return
             
             if data_content is not None:
                 if data_content:
-                    print(f"--- Contenido de {file_name} ---")
+                    print(_("--- Contenido de {name} ---").format(name=file_name))
                     try:
                         print(data_content.decode('utf-8'))
                     except UnicodeDecodeError:
-                        print("[!] El archivo contiene datos binarios, mostrando hexdump en su lugar:")
+                        print(_("[!] El archivo contiene datos binarios, mostrando hexdump en su lugar:"))
                         print(hexdump(data_content[:1024]))
                         if len(data_content) > 1024:
-                            print("\n... (mostrando solo primeros 1024 bytes) ...")
+                            print(_("\n... (mostrando solo primeros 1024 bytes) ..."))
                     print("-----------------------------------")
                 else:
-                    print("El archivo está vacío.")
+                    print(_("El archivo está vacío."))
                     
         except Exception as e:
-            print(f"Error al leer archivo: {e}")
+            print(_("Error al leer archivo: {error}").format(error=e))
             
     def do_extract(self, arg):
         """Extrae el contenido de un archivo a disco. Uso: extract <id> <ruta_destino>"""
