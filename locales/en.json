@@ -1,0 +1,18 @@
+{
+    "Error: El archivo {image_path} no existe.": "Error: File {image_path} does not exist.",
+    " v1.0.0 - Framework Educativo de Informática Forense | Por: Max Bendinelli": " v1.0.0 - Educational Digital Forensics Framework | By: Max Bendinelli",
+    "\n[+] Cargando fuente de datos: {image_path}": "\n[+] Loading data source: {image_path}",
+    "\n[+] Volcado del Sector Físico {sector} (Offset: {offset}, Tamaño: {size} bytes)": "\n[+] Physical Sector {sector} Dump (Offset: {offset}, Size: {size} bytes)",
+    "Error: Los comandos lógicos (--cluster, --identify-cluster) requieren indicar la partición con --part <indice>": "Error: Logical commands (--cluster, --identify-cluster) require specifying partition index with --part <index>",
+    "Error: Partición no inicializable.": "Error: Partition cannot be initialized.",
+    "\n[+] Volcado del Clúster Lógico {c_num} (Offset: {offset}, Tamaño: {bpc} bytes)": "\n[+] Logical Cluster {c_num} Dump (Offset: {offset}, Size: {bpc} bytes)",
+    "    Tamaño total: {size:.2f} GB": "    Total size: {size:.2f} GB",
+    "    Se encontraron {count} particiones.": "    Found {count} partitions.",
+    "\n[!] Error de permisos: Si intentas abrir un disco físico, asegúrate de ejecutar el script como Administrador.": "\n[!] Permission Error: If you are trying to open a physical disk, make sure to run the script as Administrator.",
+    "\n[!] Error inesperado: {error}": "\n[!] Unexpected error: {error}",
+    
+    "\nBienvenido al Shell Interactivo Forense.\nEscribe 'help' o '?' para listar los comandos.\n": "\nWelcome to the Interactive Forensic Shell.\nType 'help' or '?' to list available commands.\n",
+    "No se encontraron particiones.": "No partitions found.",
+    "\nParticiones disponibles:": "\nAvailable partitions:",
+    "  [{idx}] {boot} {type_name} | Offset: {start_offset} | Tamaño: {size_mb:.2f} MB": "  [{idx}] {boot} {type_name} | Offset: {start_offset} | Size: {size_mb:.2f} MB"
+}

@@ -1,4 +1,5 @@
 import cmd
+from core.i18n import _
 from core.data_source import DataSource
 from core.utils import hexdump, print_breakdown
 from fs.ntfs_parser import NTFSParser
@@ -6,7 +7,10 @@ from fs.fat_parser import FATParser
 from fs.ext4_parser import Ext4Parser
 
 class NTFSShell(cmd.Cmd):
-    intro = "\nBienvenido al Shell Interactivo Forense.\nEscribe 'help' o '?' para listar los comandos.\n"
+    @property
+    def intro(self):
+        return _("\nBienvenido al Shell Interactivo Forense.\nEscribe 'help' o '?' para listar los comandos.\n")
+        
     prompt = "Forense > "
 
     def __init__(self, data_source: DataSource, mbr_parser):
@@ -33,14 +37,16 @@ class NTFSShell(cmd.Cmd):
     def do_partitions(self, arg):
         """Lista las particiones encontradas en el disco."""
         if not self.mbr_parser.partitions:
-            print("No se encontraron particiones.")
+            print(_("No se encontraron particiones."))
             return
             
-        print("\nParticiones disponibles:")
+        print(_("\nParticiones disponibles:"))
         for idx, part in enumerate(self.mbr_parser.partitions):
             boot = "*" if part.bootable else " "
             size_mb = part.size_in_bytes / (1024**2)
-            print(f"  [{idx}] {boot} {part.type_name} | Offset: {part.start_offset} | Tamaño: {size_mb:.2f} MB")
+            print(_("  [{idx}] {boot} {type_name} | Offset: {start_offset} | Tamaño: {size_mb:.2f} MB").format(
+                idx=idx, boot=boot, type_name=part.type_name, 
+                start_offset=part.start_offset, size_mb=size_mb))
         print("")
 
     def do_imageinfo(self, arg):

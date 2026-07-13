@@ -9,6 +9,7 @@ from core.shell import NTFSShell
 from core.utils import hexdump, print_breakdown
 
 import argparse
+from core.i18n import set_language, _
 
 def main():
     parser = argparse.ArgumentParser(description="NTFSForParser - Framework Educativo Forense")
@@ -22,12 +23,15 @@ def main():
     parser.add_argument("--dump-clusters", nargs=3, metavar=('START', 'END_OR_COUNT', 'DEST'), help="Vuelca un rango de clústeres/bloques a disco (requiere --part). Ej: --dump-clusters 100 +50 out.bin")
     parser.add_argument("--part", type=int, help="Índice de la partición para comandos lógicos")
     parser.add_argument("--count", type=int, default=1, help="Cantidad de sectores/clústeres continuos a procesar")
+    parser.add_argument("--lang", type=str, default="es", choices=["es", "en"], help="Idioma de la interfaz (es, en)")
     
     args = parser.parse_args()
+    
+    set_language(args.lang)
     image_path = args.image_path
 
     if not os.path.exists(image_path) and not image_path.startswith(r"\\.\PhysicalDrive"):
-        print(f"Error: El archivo {image_path} no existe.")
+        print(_("Error: El archivo {image_path} no existe.").format(image_path=image_path))
         sys.exit(1)
 
     try:
@@ -41,9 +45,10 @@ def main():
             """
             print(banner)
             print("==========================================================================")
-            print(" v1.0.0 - Framework Educativo de Informática Forense | Por: Max Bendinelli")
             print("==========================================================================")
-            print(f"\n[+] Cargando fuente de datos: {image_path}")
+            print(_(" v1.0.0 - Framework Educativo de Informática Forense | Por: Max Bendinelli"))
+            print("==========================================================================")
+            print(_("\n[+] Cargando fuente de datos: {image_path}").format(image_path=image_path))
             
         # 1. Determinar tipo de fuente de datos
         if re.search(r'\.[0-9]{3}$', image_path.lower()):
@@ -65,7 +70,7 @@ def main():
         if args.sector is not None:
             offset = args.sector * 512
             size = args.count * 512
-            print(f"\n[+] Volcado del Sector Físico {args.sector} (Offset: {hex(offset)}, Tamaño: {size} bytes)")
+            print(_("\n[+] Volcado del Sector Físico {sector} (Offset: {offset}, Tamaño: {size} bytes)").format(sector=args.sector, offset=hex(offset), size=size))
             data = data_source.read(offset, size)
             print(hexdump(data, offset=offset))
             return
@@ -79,14 +84,14 @@ def main():
             
         if args.cluster is not None or args.identify_cluster is not None:
             if args.part is None:
-                print("Error: Los comandos lógicos (--cluster, --identify-cluster) requieren indicar la partición con --part <indice>")
+                print(_("Error: Los comandos lógicos (--cluster, --identify-cluster) requieren indicar la partición con --part <indice>"))
                 return
             
             shell = NTFSShell(data_source, mbr_parser)
             shell.do_select(str(args.part))
             
             if not shell.current_parser:
-                print("Error: Partición no inicializable.")
+                print(_("Error: Partición no inicializable."))
                 return
                 
             if args.cluster is not None:
@@ -94,7 +99,7 @@ def main():
                     c_num = args.cluster + i
                     offset = shell.current_parser.get_cluster_offset(c_num)
                     bpc = shell.current_parser.get_cluster_size()
-                    print(f"\n[+] Volcado del Clúster Lógico {c_num} (Offset: {hex(offset)}, Tamaño: {bpc} bytes)")
+                    print(_("\n[+] Volcado del Clúster Lógico {c_num} (Offset: {offset}, Tamaño: {bpc} bytes)").format(c_num=c_num, offset=hex(offset), bpc=bpc))
                     data = data_source.read(offset, bpc)
                     print(hexdump(data, offset=offset))
             
@@ -112,15 +117,15 @@ def main():
             return
             
         # Si no hay parámetros especiales, lanzar el Shell Interactivo
-        print(f"    Tamaño total: {data_source.get_size() / (1024**3):.2f} GB")
-        print(f"    Se encontraron {len(mbr_parser.partitions)} particiones.")
+        print(_("    Tamaño total: {size:.2f} GB").format(size=data_source.get_size() / (1024**3)))
+        print(_("    Se encontraron {count} particiones.").format(count=len(mbr_parser.partitions)))
         shell = NTFSShell(data_source, mbr_parser)
         shell.cmdloop()
 
     except PermissionError:
-        print("\n[!] Error de permisos: Si intentas abrir un disco físico, asegúrate de ejecutar el script como Administrador.")
+        print(_("\n[!] Error de permisos: Si intentas abrir un disco físico, asegúrate de ejecutar el script como Administrador."))
     except Exception as e:
-        print(f"\n[!] Error inesperado: {e}")
+        print(_("\n[!] Error inesperado: {error}").format(error=e))
     finally:
         if 'data_source' in locals():
             data_source.close()
