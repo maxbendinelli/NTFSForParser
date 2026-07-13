@@ -1,0 +1,121 @@
+import sys
+import os
+import re
+from core.data_source import RawImageSource, E01ImageSource, SplitRawImageSource
+from core.partition_manager import MBRParser
+from fs.ntfs_parser import NTFSParser
+from fs.fat_parser import FATParser
+from core.shell import NTFSShell
+from core.utils import hexdump, print_breakdown
+
+import argparse
+
+def main():
+    parser = argparse.ArgumentParser(description="NTFSForParser - Framework Educativo Forense")
+    parser.add_argument("image_path", help="Ruta a la imagen (.dd, .001, .e01) o dispositivo físico (\\\\.\\PhysicalDrive0)")
+    parser.add_argument("--partitions", action="store_true", help="Lista las particiones encontradas y sale")
+    parser.add_argument("--sector", type=int, help="Muestra el volcado del sector físico especificado (LBA absoluto)")
+    parser.add_argument("--cluster", type=int, help="Muestra el volcado del clúster lógico especificado (requiere --part)")
+    parser.add_argument("--identify-sector", type=int, help="Aplica Magic Bytes a un sector físico")
+    parser.add_argument("--identify-cluster", type=int, help="Aplica Magic Bytes a un clúster lógico (requiere --part)")
+    parser.add_argument("--runs", type=str, help="Imprime los Data Runs, Cadena FAT o Bloques Ext4 de un archivo (requiere --part). Usa ID o nombre.")
+    parser.add_argument("--dump-clusters", nargs=3, metavar=('START', 'END_OR_COUNT', 'DEST'), help="Vuelca un rango de clústeres/bloques a disco (requiere --part). Ej: --dump-clusters 100 +50 out.bin")
+    parser.add_argument("--part", type=int, help="Índice de la partición para comandos lógicos")
+    parser.add_argument("--count", type=int, default=1, help="Cantidad de sectores/clústeres continuos a procesar")
+    
+    args = parser.parse_args()
+    image_path = args.image_path
+
+    if not os.path.exists(image_path) and not image_path.startswith(r"\\.\PhysicalDrive"):
+        print(f"Error: El archivo {image_path} no existe.")
+        sys.exit(1)
+
+    try:
+        if not (args.partitions or args.sector is not None or args.cluster is not None or args.identify_sector is not None or args.identify_cluster is not None):
+            print("========================================")
+            print(" NTFSForParser - Framework Educativo ")
+            print("========================================")
+            print(f"[+] Cargando fuente de datos: {image_path}")
+            
+        # 1. Determinar tipo de fuente de datos
+        if re.search(r'\.[0-9]{3}$', image_path.lower()):
+            data_source = SplitRawImageSource(image_path)
+        elif image_path.lower().endswith('.e01'):
+            data_source = E01ImageSource(image_path)
+        else:
+            data_source = RawImageSource(image_path)
+            
+        # 2. Capa de Particiones
+        mbr_parser = MBRParser(data_source)
+        
+        # Ejecución CLI directa
+        if args.partitions:
+            shell = NTFSShell(data_source, mbr_parser)
+            shell.do_partitions("")
+            return
+            
+        if args.sector is not None:
+            offset = args.sector * 512
+            size = args.count * 512
+            print(f"\n[+] Volcado del Sector Físico {args.sector} (Offset: {hex(offset)}, Tamaño: {size} bytes)")
+            data = data_source.read(offset, size)
+            print(hexdump(data, offset=offset))
+            return
+            
+        if args.identify_sector is not None:
+            shell = NTFSShell(data_source, mbr_parser)
+            for i in range(args.count):
+                sector_num = args.identify_sector + i
+                shell.do_identify(f"sector {sector_num}")
+            return
+            
+        if args.cluster is not None or args.identify_cluster is not None:
+            if args.part is None:
+                print("Error: Los comandos lógicos (--cluster, --identify-cluster) requieren indicar la partición con --part <indice>")
+                return
+            
+            shell = NTFSShell(data_source, mbr_parser)
+            shell.do_select(str(args.part))
+            
+            if not shell.current_parser:
+                print("Error: Partición no inicializable.")
+                return
+                
+            if args.cluster is not None:
+                for i in range(args.count):
+                    c_num = args.cluster + i
+                    offset = shell.current_parser.get_cluster_offset(c_num)
+                    bpc = shell.current_parser.get_cluster_size()
+                    print(f"\n[+] Volcado del Clúster Lógico {c_num} (Offset: {hex(offset)}, Tamaño: {bpc} bytes)")
+                    data = data_source.read(offset, bpc)
+                    print(hexdump(data, offset=offset))
+            
+            if args.identify_cluster is not None:
+                for i in range(args.count):
+                    c_num = args.identify_cluster + i
+                    shell.do_identify(f"cluster {c_num}")
+                    
+            if args.runs is not None:
+                shell.do_runs(args.runs)
+                
+            if args.dump_clusters is not None:
+                shell.do_dump_clusters(f"{args.dump_clusters[0]} {args.dump_clusters[1]} {args.dump_clusters[2]}")
+                
+            return
+            
+        # Si no hay parámetros especiales, lanzar el Shell Interactivo
+        print(f"    Tamaño total: {data_source.get_size() / (1024**3):.2f} GB")
+        print(f"    Se encontraron {len(mbr_parser.partitions)} particiones.")
+        shell = NTFSShell(data_source, mbr_parser)
+        shell.cmdloop()
+
+    except PermissionError:
+        print("\n[!] Error de permisos: Si intentas abrir un disco físico, asegúrate de ejecutar el script como Administrador.")
+    except Exception as e:
+        print(f"\n[!] Error inesperado: {e}")
+    finally:
+        if 'data_source' in locals():
+            data_source.close()
+
+if __name__ == "__main__":
+    main()

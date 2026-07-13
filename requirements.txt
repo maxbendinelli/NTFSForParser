@@ -1,0 +1,7 @@
+# Dependencias del Framework Forense (NTFSForParser)
+
+# Para soporte de imágenes E01 (EnCase) y extracción de metadatos/hashes:
+libewf-python
+
+# Nota: El resto de módulos utilizados (struct, cmd, hashlib, argparse, etc.)
+# son parte de la librería estándar de Python.
