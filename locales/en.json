@@ -60,5 +60,47 @@
     "[!] El archivo contiene datos binarios, mostrando hexdump en su lugar:": "[!] The file contains binary data, showing hexdump instead:",
     "\n... (mostrando solo primeros 1024 bytes) ...": "\n... (showing only first 1024 bytes) ...",
     "El archivo está vacío.": "The file is empty.",
-    "Error al leer archivo: {error}": "Error reading file: {error}"
+    "Error al leer archivo: {error}": "Error reading file: {error}",
+
+    "Uso: cd <nombre>": "Usage: cd <name>",
+    "Selecciona una partición primero.": "Select a partition first.",
+
+    "Flujo de datos '{stream}' no encontrado en el archivo.": "Data stream '{stream}' not found in the file.",
+    "Ejecuta 'ls' primero para indexar este directorio.": "Run 'ls' first to index this directory.",
+    "Archivo '{target}' no encontrado o ID numérico inválido.": "File '{target}' not found or invalid numerical ID.",
+
+    "Uso: info <id>": "Usage: info <id>",
+    "Selecciona una partición válida primero.": "Select a valid partition first.",
+    "ID fuera de rango. Ejecuta 'ls' primero.": "ID out of range. Run 'ls' first.",
+
+    "Uso: runs <id_o_nombre>": "Usage: runs <id_or_name>",
+    "Ejecuta 'ls' primero para indexar este directorio.": "Run 'ls' first to index this directory.",
+
+    "Uso: extract <id> <ruta_destino>": "Usage: extract <id> <destination_path>",
+
+    "Uso: recover <id> <ruta_destino>": "Usage: recover <id> <destination_path>",
+
+    "Uso: search [-r] <patron>": "Usage: search [-r] <pattern>",
+    "Falta el patrón después de -r": "Missing pattern after -r",
+
+    "Selecciona una partición válida primero.": "Select a valid partition first.",
+
+    "Este comando es exclusivo para particiones Linux (Ext4).": "This command is exclusive to Linux (Ext4) partitions.",
+
+    "Saliendo...": "Exiting...",
+
+    "Carving finalizado.": "Carving finished.",
+    "Archivos recuperados : {count}": "Recovered files : {count}",
+    "Saltados / errores   : {count}": "Skipped / errors : {count}",
+    "No se encontraron archivos con las firmas especificadas.": "No files found matching the specified signatures.",
+    "Todos los archivos se guardaron en: {dir}": "All files saved to: {dir}",
+    "Error durante el carving: {error}": "Error during carving: {error}",
+
+    "Ya estás en el directorio raíz.": "You are already in the root directory.",
+    "Error al leer el directorio padre.": "Error reading parent directory.",
+    "No se encontró entrada '..' en este directorio.": "No '..' entry found in this directory.",
+    "Ejecuta 'ls' primero para indexar este directorio en la caché temporal.": "Run 'ls' first to index this directory in the temporary cache.",
+    "'{target}' no es un directorio.": "'{target}' is not a directory.",
+    "Directorio '{target}' no encontrado (asegúrate de ejecutar 'ls' antes).": "Directory '{target}' not found (make sure to run 'ls' first).",
+    "Directorio '{target}' no encontrado.": "Directory '{target}' not found."
 }

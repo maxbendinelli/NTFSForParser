@@ -84,6 +84,7 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 - `recover <id> <ruta_destino>`: Realiza un file carving simple para archivos borrados en FAT32, asumiendo contigüidad basándose en el registro original de su tamaño y clúster inicial.
 - `dump_clusters <inicio> <fin | +cantidad> <destino>` (o `dump_blocks`): Extrae un rango directo de clústeres o bloques crudos del disco. Ej: `dump_clusters 100 +50 out.bin`.
 - `search [-r] <patron>`: Busca un texto o expresión regular (-r) a lo largo de toda la partición. Soporta automáticamente codificación ASCII/UTF-8 y UTF-16LE (común en MFT). Extrae el contexto y su offset físico.
+- `carve <directorio_destino> [tipos...]`: Realiza **File Carving automatizado** sobre la partición cruda buscando firmas de Magic Bytes. Recupera JPEGs, PNGs, PDFs, ZIPs, EXEs, GIFs, RARs, MP3s, bases de datos SQLite y binarios ELF. Opcionalmente filtra por tipo: `carve ./out jpg pdf png`.
 - `find_orphans [limite]`: Escanea la MFT (NTFS) en busca de archivos huérfanos (cuyo directorio padre ha sido borrado o no existe).
 
 ### Sistemas Ext4 (Linux)
@@ -95,7 +96,7 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 ## 🗺️ Roadmap (Próximas Funcionalidades)
 
 - **Verificación Completa E01**: Hacer que el comando `hash_check` lea y compare automáticamente los hashes almacenados en los contenedores EnCase (.e01) contra el md5 físico de la imagen en caliente.
-- **File Carving Automatizado**: Implementar un módulo para extraer y recuperar de forma ciega archivos eliminados (PDFs, JPGs, ZIPs) rastreando *Magic Bytes* en los clústeres no asignados del disco.
+- ✅ ~~**File Carving Automatizado**~~: Implementado — usa `carve <dir> [tipos...]` para recuperar archivos eliminados por Magic Bytes (JPG, PNG, PDF, ZIP, EXE, GIF, RAR, MP3, SQLite, ELF).
 - **Expansión de Idiomas (i18n)**: Continuar la traducción del 100% de los subsistemas y parsers de bajo nivel al motor de diccionarios multi-idioma (Inglés/Español).
 
 ---

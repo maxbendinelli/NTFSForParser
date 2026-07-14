@@ -1,10 +1,12 @@
 import cmd
+import sys
 from core.i18n import _
 from core.data_source import DataSource
 from core.utils import hexdump, print_breakdown
 from fs.ntfs_parser import NTFSParser
 from fs.fat_parser import FATParser
 from fs.ext4_parser import Ext4Parser
+from fs.carver import FileCarver, SIGNATURES
 
 class NTFSShell(cmd.Cmd):
     @property
@@ -1181,6 +1183,89 @@ class NTFSShell(cmd.Cmd):
             
         sys.stdout.write("\r" + " " * 60 + "\r")
         print(f"[+] Búsqueda finalizada. Total de coincidencias encontradas: {hits}")
+
+
+    def do_carve(self, arg):
+        """Realiza File Carving automatizado buscando Magic Bytes en la partición. Uso: carve <directorio_destino> [tipos...]
+
+        Ejemplos:
+          carve ./recuperados            → busca todos los tipos soportados
+          carve ./recuperados jpg pdf    → busca solo JPEG y PDF
+
+        Tipos soportados: jpg, png, pdf, zip, exe, gif, rar, mp3, db, elf
+        """
+        if not self.current_parser:
+            print(_("Selecciona una partición válida primero."))
+            return
+
+        args = arg.split()
+        if not args:
+            print("Uso: carve <directorio_destino> [tipos...]")
+            print("Ejemplo: carve ./recuperados jpg pdf png")
+            return
+
+        output_dir = args[0]
+        filter_types = [t.lower() for t in args[1:]] if len(args) > 1 else []
+
+        # Filtrar firmas según los tipos solicitados
+        if filter_types:
+            custom_sigs = [s for s in SIGNATURES if s["ext"].lower() in filter_types]
+            if not custom_sigs:
+                print(f"[!] Ningún tipo válido reconocido. Tipos disponibles: {', '.join(s['ext'] for s in SIGNATURES)}")
+                return
+        else:
+            custom_sigs = None  # Usar todas las firmas
+
+        # Resumen previo
+        sigs_to_use = custom_sigs if custom_sigs else SIGNATURES
+        print(f"\n[+] Iniciando File Carving automatizado en la partición {self.selected_partition}...")
+        print(f"    Directorio de salida : {output_dir}")
+        print(f"    Tipos a buscar       : {', '.join(s['name'] for s in sigs_to_use)}")
+        print(f"    Tamaño de partición  : {self.current_parser.partition.size_in_bytes / (1024**2):.2f} MB")
+        print("    Esto puede tardar varios minutos en particiones grandes.")
+        print("-" * 80)
+
+        spinner = ['|', '/', '-', '\\']
+        spinner_idx = [0]  # lista para capturar en closure
+
+        def progress(pct, msg):
+            spin_char = spinner[spinner_idx[0] % len(spinner)]
+            bar_length = 30
+            filled = int(bar_length * pct // 100)
+            bar = '=' * filled + '-' * (bar_length - filled)
+            sys.stdout.write(f"\r    [{bar}] {pct:3d}% {spin_char}  {msg}")
+            sys.stdout.flush()
+            spinner_idx[0] += 1
+
+        try:
+            carver = FileCarver(
+                data_source=self.data_source,
+                partition=self.current_parser.partition,
+                output_dir=output_dir,
+                progress_cb=progress,
+                custom_signatures=custom_sigs,
+            )
+            results = carver.carve()
+
+            sys.stdout.write("\n")
+            print(f"\n[+] Carving finalizado.")
+            print(f"    Archivos recuperados : {len(results)}")
+            print(f"    Saltados / errores   : {carver.skipped_count}")
+
+            if results:
+                print(f"\n    {'#':<6} | {'Tipo':<22} | {'Offset':<14} | {'Tamaño':<12} | {'Footer':<8} | Nombre")
+                print("    " + "-" * 90)
+                for r in results:
+                    footer_ok = "✓" if r["footer_found"] else "(truncado)"
+                    size_kb   = r["size"] / 1024
+                    print(f"    {r['index']:<6} | {r['type']:<22} | {hex(r['abs_offset']):<14} | {size_kb:>8.1f} KB | {footer_ok:<10} | {r['filename']}")
+                print(f"\n    Todos los archivos se guardaron en: {output_dir}")
+            else:
+                print("    No se encontraron archivos con las firmas especificadas.")
+
+        except Exception as e:
+            sys.stdout.write("\n")
+            print(f"[!] Error durante el carving: {e}")
 
 
 

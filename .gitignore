@@ -1,0 +1,41 @@
+# Imágenes de disco forenses (archivos de prueba / evidencia)
+*.dd
+*.raw
+*.img
+*.e01
+*.e02
+*.s01
+*.001
+*.bin
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+ENV/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs y temporales
+*.log
+*.tmp
+
+# Distribución / Empaquetado
+*.spec
