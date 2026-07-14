@@ -1,4 +1,4 @@
-# 🕵️‍♂️ NTFSForParser - Framework Forense Educativo
+# NTFSForParser - Framework Forense Educativo
 
 <div align="center">
   <img src="assets/logo.png" alt="NTFSForParser Logo" width="400"/>
