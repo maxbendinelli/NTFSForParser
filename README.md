@@ -19,8 +19,9 @@ Actualmente soporta análisis profundo sobre particiones **FAT32** y **NTFS**, e
    - Fechas FILETIME (`$STANDARD_INFORMATION`) de 100-nanosegundos para MFT (NTFS).
 3. **Navegación Jerárquica:** El comando `cd` te permite entrar a carpetas y el comando `ls` te muestra el contenido en vivo.
 4. **Data Carving y Recuperación:** Usa el comando `recover` para demostrar la técnica de *File Carving* de archivos borrados contiguos en FAT32 directamente desde la estructura de metadatos.
-5. **Comprobación de Integridad:** Usa `hash_check` para leer tu imagen completa y comparar su hash MD5 con el original (si está embebido en E01), asegurando la **Cadena de Custodia**.
-6. **Múltiples Formatos Soportados:** Imágenes RAW completas, Divididas/Split (001, 002) y contenedores EnCase (E01).
+5. **Comprobación de Integridad Forense Avanzada:** Usa `hash_check` para leer la imagen y verificar hashes. Para E01, extrae y compara hashes MD5/SHA1 internos y realiza comprobaciones de integridad CRC por chunk.
+6. **File Carving Automatizado:** Con soporte para más de 50 firmas de archivos estructurados por categorías (imágenes, audios, vídeos, documentos, comprimidos, ejecutables, bases de datos, llaves criptográficas, registros de Windows, etc.) usando la técnica de Magic Bytes.
+7. **Múltiples Formatos Soportados:** Imágenes RAW completas, Divididas/Split (001, 002) y contenedores EnCase (E01).
 
 ---
 
