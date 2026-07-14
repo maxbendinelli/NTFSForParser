@@ -63,7 +63,7 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 - `partitions`: Lista todas las particiones encontradas en la Tabla de Particiones (MBR).
 - `select <num>`: Activa y monta internamente una de las particiones listadas.
 - `imageinfo`: Imprime todos los metadatos forenses almacenados por el perito si la imagen es un contenedor EnCase (.e01).
-- `hash_check`: Recalcula el Hash MD5 de la imagen completa byte por byte y lo compara contra el original para alertar de corrupción o alteración de evidencia.
+- `hash_check [md5|sha1|sha256|all]`: Verifica la integridad de la imagen cargada. **Para E01**: (1) lee los hashes almacenados en el contenedor (MD5/SHA1), (2) verifica los CRC internos por chunk, (3) calcula los hashes reales y los compara — emitiendo veredicto sobre la cadena de custodia. **Para RAW/DD**: calcula y muestra los hashes sin referencia.
 
 ### Inspección de Bajo Nivel
 - `hexdump <offset>`: Volcado hexadecimal puro desde el inicio del archivo.
@@ -106,7 +106,7 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 
 ## 🗺️ Roadmap (Próximas Funcionalidades)
 
-- **Verificación Completa E01**: Hacer que el comando `hash_check` lea y compare automáticamente los hashes almacenados en los contenedores EnCase (.e01) contra el md5 físico de la imagen en caliente.
+- ✅ ~~**Verificación Completa E01**~~: Implementado — `hash_check` lee los hashes almacenados en el contenedor E01 (MD5/SHA1), verifica los CRC internos por chunk y compara contra el hash calculado en tiempo real. Soporta también SHA256 como argumento opcional.
 - ✅ ~~**File Carving Automatizado**~~: Implementado — usa `carve <dir> [tipos...]` para recuperar archivos eliminados por Magic Bytes (JPG, PNG, PDF, ZIP, EXE, GIF, RAR, MP3, SQLite, ELF).
 - **Expansión de Idiomas (i18n)**: Continuar la traducción del 100% de los subsistemas y parsers de bajo nivel al motor de diccionarios multi-idioma (Inglés/Español).
 

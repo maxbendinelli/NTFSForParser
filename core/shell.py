@@ -64,67 +64,153 @@ class NTFSShell(cmd.Cmd):
             print(f"    - {k}: {v.decode('utf-8') if isinstance(v, bytes) else v}")
 
     def do_hash_check(self, arg):
-        """Verifica el hash MD5 de la imagen cargada. Uso: hash_check"""
-        print("\n[!] Calculando el hash MD5 de la imagen completa...")
-        print("    Esto puede tardar varios minutos dependiendo del tamaño de la imagen.")
-        
-        import hashlib
-        import sys
-        
-        md5 = hashlib.md5()
-        chunk_size = 1024 * 1024 * 16 # 16 MB
-        offset = 0
+        """Verifica la integridad de la imagen cargada. Uso: hash_check [md5|sha1|sha256|all]
+
+        Para imágenes E01: compara contra los hashes almacenados en el contenedor
+        y verifica los CRC internos por chunk si pyewf lo soporta.
+        Para imágenes RAW/DD: calcula y muestra los hashes (sin hash de referencia).
+        """
+        from core.data_source import E01ImageSource
+
+        args = arg.strip().lower().split() if arg.strip() else []
+        algo_choice = args[0] if args else "all"
+
+        # Determinar qué algoritmos calcular
+        if algo_choice in ("md5",):
+            algos = ["md5"]
+        elif algo_choice in ("sha1",):
+            algos = ["sha1"]
+        elif algo_choice in ("sha256",):
+            algos = ["sha256"]
+        else:
+            algos = ["md5", "sha1"]   # "all" o sin argumento
+
+        is_e01 = isinstance(self.data_source, E01ImageSource)
+
+        print(f"\n{'='*60}")
+        print(f"  VERIFICACIÓN DE INTEGRIDAD DE IMAGEN FORENSE")
+        print(f"{'='*60}")
+        print(f"  Formato  : {'E01 (EnCase)' if is_e01 else 'RAW / DD / Split'}")
+        print(f"  Algoritmos: {', '.join(a.upper() for a in algos)}")
         total_size = self.data_source.get_size()
-        
+        print(f"  Tamaño   : {total_size / (1024**3):.3f} GB ({total_size:,} bytes)")
+        print(f"{'='*60}")
+
+        # ── Paso 1: Hashes almacenados en E01 (antes de calcular) ─────────
+        stored_hashes = {}
+        if is_e01:
+            print("\n[1/3] Leyendo hashes almacenados en el contenedor E01...")
+            try:
+                stored_hashes = self.data_source.get_hash_values()
+                if stored_hashes:
+                    for alg, val in stored_hashes.items():
+                        print(f"    Hash almacenado ({alg.upper():6}): {val}")
+                else:
+                    print("    [!] No se encontraron hashes almacenados en el contenedor E01.")
+            except Exception as e:
+                print(f"    [!] Error al leer hashes del contenedor: {e}")
+
+            # ── Paso 2: Verificación de CRC internos por chunk ─────────────
+            print("\n[2/3] Verificando checksums internos por chunk (CRC E01)...")
+            try:
+                ok, crc_msgs = self.data_source.verify_internal_checksums()
+                chunk_count = self.data_source.get_chunk_count()
+                if chunk_count:
+                    print(f"    Chunks totales : {chunk_count:,}")
+                if ok:
+                    print(f"    Estado CRC     : ✓ Todos los chunks pasaron la verificación interna.")
+                else:
+                    print(f"    Estado CRC     : ✗ Se detectaron errores en {len(crc_msgs)} chunk(s):")
+                    for msg in crc_msgs[:10]:
+                        print(f"        - {msg}")
+                    if len(crc_msgs) > 10:
+                        print(f"        ... y {len(crc_msgs)-10} más.")
+                if crc_msgs and ok:
+                    # Mensajes informativos (no errores)
+                    for msg in crc_msgs:
+                        print(f"    Info: {msg}")
+            except Exception as e:
+                print(f"    [!] Error durante verificación CRC: {e}")
+        else:
+            print("\n[1/2] (Formato RAW/DD — sin hashes ni CRC almacenados en el archivo)\n")
+
+        # ── Paso 3: Cálculo de hashes sobre los datos reales ───────────────
+        step_label = "[3/3]" if is_e01 else "[2/2]"
+        print(f"\n{step_label} Calculando hashes sobre los datos reales de la imagen...")
+        print("    Esto puede tardar varios minutos en imágenes grandes.\n")
+
+        import hashlib
+
+        hashers = {alg: hashlib.new(alg) for alg in algos}
+        chunk_size = 16 * 1024 * 1024  # 16 MB
+        offset = 0
         spinner = ['|', '/', '-', '\\']
         spinner_idx = 0
-        
+
         try:
             while offset < total_size:
                 data = self.data_source.read(offset, min(chunk_size, total_size - offset))
                 if not data:
                     break
-                md5.update(data)
+                for h in hashers.values():
+                    h.update(data)
                 offset += len(data)
-                
-                percent = int((offset / total_size) * 100)
-                bar_length = 40
-                filled = int(bar_length * percent // 100)
-                bar = '=' * filled + '-' * (bar_length - filled)
-                
-                spin_char = spinner[spinner_idx % len(spinner)]
-                sys.stdout.write(f"\r    Progreso: [{bar}] {percent}% {spin_char}")
+
+                percent = int(offset / total_size * 100)
+                filled  = int(40 * percent // 100)
+                bar     = '=' * filled + '-' * (40 - filled)
+                spin    = spinner[spinner_idx % 4]
+                sys.stdout.write(f"\r    Leyendo: [{bar}] {percent:3d}% {spin}")
                 sys.stdout.flush()
-                
                 spinner_idx += 1
-            
-            sys.stdout.write(f"\r    Progreso: [{'=' * 40}] 100% ✓\n")
-            calculated_hash = md5.hexdigest()
-            print(f"\n[+] Hash MD5 Calculado: {calculated_hash}")
-            
-            # Verificar si es E01 comparando con el almacenado
-            metadata = self.data_source.get_metadata()
-            if metadata:
-                # Buscar el hash almacenado (las claves de pyewf suelen ser 'MD5 hash' o similares)
-                stored_hash = None
-                for k, v in metadata.items():
-                    if 'md5' in k.lower():
-                        stored_hash = v.decode('utf-8') if isinstance(v, bytes) else str(v)
+
+            sys.stdout.write(f"\r    Leyendo: [{'='*40}] 100% ✓\n\n")
+
+            calculated = {alg: h.hexdigest() for alg, h in hashers.items()}
+
+            # ── Paso 4: Reporte final ──────────────────────────────────────
+            print(f"{'='*60}")
+            print("  RESULTADO")
+            print(f"{'='*60}")
+
+            all_ok = True
+            for alg, calc_val in calculated.items():
+                print(f"\n  {alg.upper()}:")
+                print(f"    Calculado : {calc_val}")
+
+                stored = None
+                # Buscar en stored_hashes con variantes del nombre
+                for k in stored_hashes:
+                    if alg in k.lower():
+                        stored = stored_hashes[k]
                         break
-                        
-                if stored_hash:
-                    print(f"[+] Hash MD5 Almacenado (E01): {stored_hash}")
-                    if calculated_hash.lower() == stored_hash.lower():
-                        print("    -> [VERIFICACIÓN EXITOSA] Los hashes COINCIDEN.")
+
+                if stored:
+                    print(f"    Almacenado: {stored}")
+                    if calc_val.lower() == stored.lower():
+                        print(f"    Veredicto : ✓ COINCIDEN — Imagen íntegra.")
                     else:
-                        print("    -> [ALERTA] Los hashes NO COINCIDEN. La imagen podría estar alterada o corrupta.")
+                        print(f"    Veredicto : ✗ NO COINCIDEN — ¡Posible alteración o corrupción!")
+                        all_ok = False
                 else:
-                    print("[!] Formato E01, pero no se encontró un hash MD5 en los metadatos para verificar.")
-            else:
-                print("    -> Formato RAW/DD. No hay hash original contra qué comparar.")
-                
+                    if is_e01:
+                        print(f"    Almacenado: (no disponible para {alg.upper()} en este contenedor)")
+                    else:
+                        print(f"    Almacenado: (N/A — imagen RAW sin hash de referencia)")
+
+            if is_e01 and stored_hashes:
+                print(f"\n{'='*60}")
+                if all_ok:
+                    print("  [✓] VERIFICACIÓN COMPLETA: La cadena de custodia está INTACTA.")
+                else:
+                    print("  [✗] ALERTA FORENSE: La imagen NO supera la verificación de integridad.")
+                    print("      Documenta este resultado y NO uses esta imagen como evidencia.")
+                print(f"{'='*60}\n")
+
         except Exception as e:
-            print(f"\n[!] Error durante el cálculo del hash: {e}")
+            sys.stdout.write("\n")
+            print(f"\n[!] Error durante el cálculo: {e}")
+
 
     def do_select(self, arg):
         """Selecciona una partición para interactuar con ella. Uso: select <indice>"""

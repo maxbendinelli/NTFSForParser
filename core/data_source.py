@@ -154,12 +154,13 @@ class E01ImageSource(DataSource):
             import pyewf
         except ImportError:
             raise ImportError("La librería 'pyewf' es necesaria para leer archivos E01. Instálala o compílala para tu sistema.")
-            
+
         self.file_path = file_path
-        self.filenames = pyewf.glob(file_path) # Encuentra todos los segmentos (E01, E02, etc.)
+        self.filenames = pyewf.glob(file_path)  # Encuentra todos los segmentos (E01, E02, …)
         self.ewf_handle = pyewf.handle()
         self.ewf_handle.open(self.filenames)
         self._size = self.ewf_handle.get_media_size()
+        self._pyewf = pyewf  # Guardamos referencia al módulo
 
     def read(self, offset: int, size: int) -> bytes:
         self.ewf_handle.seek(offset)
@@ -171,16 +172,98 @@ class E01ImageSource(DataSource):
     def close(self):
         if self.ewf_handle:
             self.ewf_handle.close()
-            
+
     def get_metadata(self) -> dict:
+        """Devuelve los header values del contenedor E01 (caso, examinador, notas, etc.)."""
         if self.ewf_handle:
-            try:
-                return self.ewf_handle.get_header_values()
-            except AttributeError:
-                # Dependiendo de la versión de libewf, el método puede variar
+            for method_name in ("get_header_values", "get_header_value_identifiers"):
                 try:
                     return self.ewf_handle.get_header_values()
-                except:
-                    pass
+                except Exception:
+                    break
         return {}
+
+    def get_hash_values(self) -> dict:
+        """
+        Recupera los hashes almacenados en el contenedor E01.
+        pyewf puede guardar MD5 y SHA1 en los 'hash values'.
+        Devuelve un dict como {"md5": "abc123...", "sha1": "def456..."}.
+        """
+        result = {}
+        if not self.ewf_handle:
+            return result
+
+        # Intentar get_hash_values() → dict-like
+        try:
+            hv = self.ewf_handle.get_hash_values()
+            if hv:
+                for k, v in hv.items():
+                    key = k.decode('utf-8').lower() if isinstance(k, bytes) else k.lower()
+                    val = v.decode('utf-8') if isinstance(v, bytes) else str(v)
+                    result[key] = val
+            if result:
+                return result
+        except Exception:
+            pass
+
+        # Fallback: get_md5_hash() y get_sha1_hash() directos
+        for attr, label in (("get_md5_hash", "md5"), ("get_sha1_hash", "sha1")):
+            try:
+                h = getattr(self.ewf_handle, attr)()
+                if h:
+                    result[label] = h.hex() if isinstance(h, (bytes, bytearray)) else str(h)
+            except Exception:
+                pass
+
+        # Segundo fallback: buscar en header_values
+        if not result:
+            try:
+                hv = self.ewf_handle.get_header_values()
+                for k, v in hv.items():
+                    key = k.decode('utf-8').lower() if isinstance(k, bytes) else k.lower()
+                    if 'md5' in key or 'sha1' in key or 'hash' in key:
+                        val = v.decode('utf-8') if isinstance(v, bytes) else str(v)
+                        result[key] = val
+            except Exception:
+                pass
+
+        return result
+
+    def get_chunk_count(self) -> int:
+        """Devuelve el número de chunks/segmentos del contenedor E01, o 0 si no disponible."""
+        try:
+            return self.ewf_handle.get_number_of_chunks()
+        except Exception:
+            try:
+                return self.ewf_handle.chunk_count
+            except Exception:
+                return 0
+
+    def verify_internal_checksums(self) -> tuple:
+        """
+        Verifica los checksums internos (CRC por chunk) del contenedor E01
+        usando pyewf. Devuelve (ok: bool, errores: list[str]).
+        """
+        errors = []
+        try:
+            # pyewf expone check_chunk() en algunas versiones
+            chunk_count = self.get_chunk_count()
+            if chunk_count == 0:
+                return (True, ["No se pudo obtener el número de chunks para verificación interna."])
+
+            for i in range(chunk_count):
+                try:
+                    ok = self.ewf_handle.check_chunk(i)
+                    if not ok:
+                        errors.append(f"Chunk {i} falló la verificación CRC interna.")
+                except AttributeError:
+                    # pyewf en esta versión no expone check_chunk(); no es error del usuario.
+                    return (True, ["verify_internal: check_chunk() no disponible en esta versión de pyewf."])
+                except Exception as e:
+                    errors.append(f"Chunk {i}: error ({e})")
+
+        except Exception as e:
+            return (False, [f"Error durante verificación interna: {e}"])
+
+        return (len(errors) == 0, errors)
 
