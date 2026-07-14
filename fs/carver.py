@@ -12,79 +12,561 @@ import re
 
 # ---------------------------------------------------------------------------
 # Tabla de firmas (Magic Bytes)
-# Cada entrada: (nombre, header_bytes, footer_bytes, max_size_bytes, extension)
-# footer=None → se usa max_size para truncar
+# Cada entrada: nombre, ext, header, footer, max_size (bytes)
+# footer=None → se usa max_size como límite de extracción
+#
+# Organizada por categorías:
+#   - Imágenes
+#   - Audio
+#   - Vídeo
+#   - Documentos Office y texto
+#   - Archivos comprimidos
+#   - Ejecutables y bibliotecas
+#   - Bases de datos y registros
+#   - Artefactos forenses (Windows, Linux)
+#   - Certificados / Claves criptográficas
+#   - Otros formatos populares
 # ---------------------------------------------------------------------------
 SIGNATURES = [
+
+    # ── Imágenes ───────────────────────────────────────────────────────────
     {
         "name": "JPEG",
         "ext": "jpg",
         "header": b"\xFF\xD8\xFF",
         "footer": b"\xFF\xD9",
-        "max_size": 15 * 1024 * 1024,   # 15 MB
+        "max_size": 15 * 1024 * 1024,
     },
     {
         "name": "PNG",
         "ext": "png",
         "header": b"\x89PNG\r\n\x1a\n",
         "footer": b"\x00\x00\x00\x00IEND\xAE\x42\x60\x82",
-        "max_size": 30 * 1024 * 1024,   # 30 MB
-    },
-    {
-        "name": "PDF",
-        "ext": "pdf",
-        "header": b"%PDF",
-        "footer": b"%%EOF",
-        "max_size": 50 * 1024 * 1024,   # 50 MB
-    },
-    {
-        "name": "ZIP / Office Open XML",
-        "ext": "zip",
-        "header": b"PK\x03\x04",
-        "footer": b"PK\x05\x06",
-        "max_size": 100 * 1024 * 1024,  # 100 MB
-    },
-    {
-        "name": "EXE / DLL (PE)",
-        "ext": "exe",
-        "header": b"MZ",
-        "footer": None,
-        "max_size": 20 * 1024 * 1024,   # 20 MB
+        "max_size": 30 * 1024 * 1024,
     },
     {
         "name": "GIF",
         "ext": "gif",
         "header": b"GIF8",
         "footer": b"\x00\x3B",
-        "max_size": 10 * 1024 * 1024,   # 10 MB
+        "max_size": 10 * 1024 * 1024,
     },
     {
-        "name": "RAR",
-        "ext": "rar",
-        "header": b"Rar!\x1A\x07",
+        "name": "BMP",
+        "ext": "bmp",
+        "header": b"BM",
         "footer": None,
-        "max_size": 100 * 1024 * 1024,  # 100 MB
+        "max_size": 30 * 1024 * 1024,
     },
     {
-        "name": "MP3",
+        "name": "TIFF (little-endian)",
+        "ext": "tif",
+        "header": b"II\x2A\x00",
+        "footer": None,
+        "max_size": 100 * 1024 * 1024,
+    },
+    {
+        "name": "TIFF (big-endian)",
+        "ext": "tif",
+        "header": b"MM\x00\x2A",
+        "footer": None,
+        "max_size": 100 * 1024 * 1024,
+    },
+    {
+        "name": "WebP",
+        "ext": "webp",
+        "header": b"RIFF",           # Se refina después con b"WEBP" en offset 8
+        "footer": None,
+        "max_size": 20 * 1024 * 1024,
+    },
+    {
+        "name": "ICO",
+        "ext": "ico",
+        "header": b"\x00\x00\x01\x00",
+        "footer": None,
+        "max_size": 1 * 1024 * 1024,
+    },
+    {
+        "name": "PSD (Photoshop)",
+        "ext": "psd",
+        "header": b"8BPS",
+        "footer": None,
+        "max_size": 500 * 1024 * 1024,
+    },
+
+    # ── Audio ──────────────────────────────────────────────────────────────
+    {
+        "name": "MP3 (ID3 tag)",
         "ext": "mp3",
         "header": b"ID3",
         "footer": None,
-        "max_size": 20 * 1024 * 1024,   # 20 MB
+        "max_size": 20 * 1024 * 1024,
     },
+    {
+        "name": "MP3 (sin tag)",
+        "ext": "mp3",
+        "header": b"\xFF\xFB",
+        "footer": None,
+        "max_size": 20 * 1024 * 1024,
+    },
+    {
+        "name": "WAV / AVI (RIFF)",
+        "ext": "wav",
+        "header": b"RIFF",
+        "footer": None,
+        "max_size": 300 * 1024 * 1024,
+    },
+    {
+        "name": "FLAC",
+        "ext": "flac",
+        "header": b"fLaC",
+        "footer": None,
+        "max_size": 100 * 1024 * 1024,
+    },
+    {
+        "name": "OGG",
+        "ext": "ogg",
+        "header": b"OggS",
+        "footer": None,
+        "max_size": 50 * 1024 * 1024,
+    },
+    {
+        "name": "AAC / M4A (MP4 audio)",
+        "ext": "m4a",
+        "header": b"\x00\x00\x00\x20ftyp",
+        "footer": None,
+        "max_size": 50 * 1024 * 1024,
+    },
+    {
+        "name": "MIDI",
+        "ext": "mid",
+        "header": b"MThd",
+        "footer": None,
+        "max_size": 5 * 1024 * 1024,
+    },
+
+    # ── Vídeo ──────────────────────────────────────────────────────────────
+    {
+        "name": "MP4 / MOV (ftyp)",
+        "ext": "mp4",
+        "header": b"ftyp",
+        "footer": None,
+        "max_size": 2 * 1024 * 1024 * 1024,  # 2 GB
+    },
+    {
+        "name": "AVI",
+        "ext": "avi",
+        "header": b"RIFF",
+        "footer": None,
+        "max_size": 2 * 1024 * 1024 * 1024,
+    },
+    {
+        "name": "FLV",
+        "ext": "flv",
+        "header": b"FLV\x01",
+        "footer": None,
+        "max_size": 500 * 1024 * 1024,
+    },
+    {
+        "name": "MKV / WebM (EBML)",
+        "ext": "mkv",
+        "header": b"\x1A\x45\xDF\xA3",
+        "footer": None,
+        "max_size": 2 * 1024 * 1024 * 1024,
+    },
+    {
+        "name": "MPEG",
+        "ext": "mpg",
+        "header": b"\x00\x00\x01\xBA",
+        "footer": b"\x00\x00\x01\xB9",
+        "max_size": 500 * 1024 * 1024,
+    },
+    {
+        "name": "WMV / WMA (ASF)",
+        "ext": "wmv",
+        "header": b"\x30\x26\xB2\x75\x8E\x66\xCF\x11",
+        "footer": None,
+        "max_size": 500 * 1024 * 1024,
+    },
+
+    # ── Documentos Office y texto ──────────────────────────────────────────
+    {
+        "name": "PDF",
+        "ext": "pdf",
+        "header": b"%PDF",
+        "footer": b"%%EOF",
+        "max_size": 50 * 1024 * 1024,
+    },
+    {
+        "name": "Office OpenXML (DOCX/XLSX/PPTX)",
+        "ext": "docx",
+        "header": b"PK\x03\x04",
+        "footer": b"PK\x05\x06",
+        "max_size": 100 * 1024 * 1024,
+    },
+    {
+        "name": "DOC / XLS / PPT (OLE2)",
+        "ext": "doc",
+        "header": b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1",
+        "footer": None,
+        "max_size": 50 * 1024 * 1024,
+    },
+    {
+        "name": "RTF",
+        "ext": "rtf",
+        "header": b"{\\rtf",
+        "footer": b"}",
+        "max_size": 20 * 1024 * 1024,
+    },
+    {
+        "name": "XML",
+        "ext": "xml",
+        "header": b"<?xml",
+        "footer": None,
+        "max_size": 10 * 1024 * 1024,
+    },
+    {
+        "name": "HTML",
+        "ext": "html",
+        "header": b"<!DOCTYPE html",
+        "footer": b"</html>",
+        "max_size": 5 * 1024 * 1024,
+    },
+    {
+        "name": "ODF (ODT/ODS/ODP)",
+        "ext": "odt",
+        "header": b"PK\x03\x04",
+        "footer": b"PK\x05\x06",
+        "max_size": 50 * 1024 * 1024,
+    },
+
+    # ── Archivos comprimidos ───────────────────────────────────────────────
+    {
+        "name": "ZIP",
+        "ext": "zip",
+        "header": b"PK\x03\x04",
+        "footer": b"PK\x05\x06",
+        "max_size": 500 * 1024 * 1024,
+    },
+    {
+        "name": "RAR (v4)",
+        "ext": "rar",
+        "header": b"Rar!\x1A\x07\x00",
+        "footer": None,
+        "max_size": 500 * 1024 * 1024,
+    },
+    {
+        "name": "RAR (v5)",
+        "ext": "rar",
+        "header": b"Rar!\x1A\x07\x01\x00",
+        "footer": None,
+        "max_size": 500 * 1024 * 1024,
+    },
+    {
+        "name": "7-Zip",
+        "ext": "7z",
+        "header": b"7z\xBC\xAF\x27\x1C",
+        "footer": None,
+        "max_size": 500 * 1024 * 1024,
+    },
+    {
+        "name": "GZIP",
+        "ext": "gz",
+        "header": b"\x1F\x8B\x08",
+        "footer": None,
+        "max_size": 500 * 1024 * 1024,
+    },
+    {
+        "name": "BZIP2",
+        "ext": "bz2",
+        "header": b"BZh",
+        "footer": None,
+        "max_size": 500 * 1024 * 1024,
+    },
+    {
+        "name": "XZ / LZMA",
+        "ext": "xz",
+        "header": b"\xFD7zXZ\x00",
+        "footer": b"\x00\x00",
+        "max_size": 500 * 1024 * 1024,
+    },
+    {
+        "name": "TAR",
+        "ext": "tar",
+        "header": b"ustar",
+        "footer": None,
+        "max_size": 1024 * 1024 * 1024,
+    },
+    {
+        "name": "ISO 9660 (imagen CD/DVD)",
+        "ext": "iso",
+        "header": b"\x00CD001",
+        "footer": None,
+        "max_size": 700 * 1024 * 1024,
+    },
+    {
+        "name": "VMDK (VMware disco)",
+        "ext": "vmdk",
+        "header": b"KDMV",
+        "footer": None,
+        "max_size": 2 * 1024 * 1024 * 1024,
+    },
+
+    # ── Ejecutables y bibliotecas ──────────────────────────────────────────
+    {
+        "name": "EXE / DLL (PE Windows)",
+        "ext": "exe",
+        "header": b"MZ",
+        "footer": None,
+        "max_size": 50 * 1024 * 1024,
+    },
+    {
+        "name": "ELF (Linux/Unix Binary)",
+        "ext": "elf",
+        "header": b"\x7fELF",
+        "footer": None,
+        "max_size": 50 * 1024 * 1024,
+    },
+    {
+        "name": "Mach-O (macOS Binary)",
+        "ext": "macho",
+        "header": b"\xCE\xFA\xED\xFE",
+        "footer": None,
+        "max_size": 50 * 1024 * 1024,
+    },
+    {
+        "name": "Mach-O 64-bit (macOS)",
+        "ext": "macho",
+        "header": b"\xCF\xFA\xED\xFE",
+        "footer": None,
+        "max_size": 50 * 1024 * 1024,
+    },
+    {
+        "name": "Java CLASS",
+        "ext": "class",
+        "header": b"\xCA\xFE\xBA\xBE",
+        "footer": None,
+        "max_size": 10 * 1024 * 1024,
+    },
+    {
+        "name": "Python bytecode (.pyc)",
+        "ext": "pyc",
+        "header": b"\x55\x0D\x0D\x0A",    # Python 3.8+
+        "footer": None,
+        "max_size": 5 * 1024 * 1024,
+    },
+    {
+        "name": "WebAssembly (.wasm)",
+        "ext": "wasm",
+        "header": b"\x00asm",
+        "footer": None,
+        "max_size": 20 * 1024 * 1024,
+    },
+
+    # ── Bases de datos y registros ─────────────────────────────────────────
     {
         "name": "SQLite DB",
         "ext": "db",
         "header": b"SQLite format 3\x00",
         "footer": None,
-        "max_size": 50 * 1024 * 1024,   # 50 MB
+        "max_size": 500 * 1024 * 1024,
     },
     {
-        "name": "ELF (Linux Binary)",
-        "ext": "elf",
-        "header": b"\x7fELF",
+        "name": "Windows Registry Hive",
+        "ext": "hive",
+        "header": b"regf",
         "footer": None,
-        "max_size": 50 * 1024 * 1024,   # 50 MB
+        "max_size": 100 * 1024 * 1024,
+    },
+    {
+        "name": "Windows Event Log (EVT)",
+        "ext": "evt",
+        "header": b"LfLe",
+        "footer": None,
+        "max_size": 100 * 1024 * 1024,
+    },
+    {
+        "name": "Windows Event Log (EVTX)",
+        "ext": "evtx",
+        "header": b"ElfFile\x00",
+        "footer": None,
+        "max_size": 100 * 1024 * 1024,
+    },
+    {
+        "name": "Windows Prefetch (.pf)",
+        "ext": "pf",
+        "header": b"SCCA",
+        "footer": None,
+        "max_size": 1 * 1024 * 1024,
+    },
+    {
+        "name": "Windows LNK (Shortcut)",
+        "ext": "lnk",
+        "header": b"\x4C\x00\x00\x00\x01\x14\x02\x00",
+        "footer": None,
+        "max_size": 2 * 1024 * 1024,
+    },
+    {
+        "name": "Windows Thumbs.db (OLE2)",
+        "ext": "db",
+        "header": b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1",
+        "footer": None,
+        "max_size": 10 * 1024 * 1024,
+    },
+    {
+        "name": "Crash Dump / Minidump",
+        "ext": "dmp",
+        "header": b"MDMP",
+        "footer": None,
+        "max_size": 500 * 1024 * 1024,
+    },
+    {
+        "name": "Windows Recycle Bin ($I)",
+        "ext": "ri",
+        "header": b"\x01\x00\x00\x00\x00\x00\x00\x00",
+        "footer": None,
+        "max_size": 1 * 1024 * 1024,
+    },
+
+    # ── Artefactos forenses / imágenes de disco ────────────────────────────
+    {
+        "name": "PCAP (captura de red)",
+        "ext": "pcap",
+        "header": b"\xD4\xC3\xB2\xA1",
+        "footer": None,
+        "max_size": 500 * 1024 * 1024,
+    },
+    {
+        "name": "PCAPng (captura de red v2)",
+        "ext": "pcapng",
+        "header": b"\x0A\x0D\x0D\x0A",
+        "footer": None,
+        "max_size": 500 * 1024 * 1024,
+    },
+
+    # ── Certificados y criptografía ────────────────────────────────────────
+    {
+        "name": "X.509 Certificate (DER)",
+        "ext": "cer",
+        "header": b"\x30\x82",
+        "footer": None,
+        "max_size": 1 * 1024 * 1024,
+    },
+    {
+        "name": "PEM Certificate / Key",
+        "ext": "pem",
+        "header": b"-----BEGIN",
+        "footer": b"-----END",
+        "max_size": 1 * 1024 * 1024,
+    },
+    {
+        "name": "PGP / GPG (mensaje)",
+        "ext": "pgp",
+        "header": b"-----BEGIN PGP",
+        "footer": b"-----END PGP",
+        "max_size": 10 * 1024 * 1024,
+    },
+    {
+        "name": "Bitcoin Wallet",
+        "ext": "wallet",
+        "header": b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00",
+        "footer": None,
+        "max_size": 10 * 1024 * 1024,
+    },
+
+    # ── Fuentes tipográficas ───────────────────────────────────────────────
+    {
+        "name": "TrueType Font (TTF)",
+        "ext": "ttf",
+        "header": b"\x00\x01\x00\x00\x00",
+        "footer": None,
+        "max_size": 10 * 1024 * 1024,
+    },
+    {
+        "name": "WOFF Font",
+        "ext": "woff",
+        "header": b"wOFF",
+        "footer": None,
+        "max_size": 5 * 1024 * 1024,
+    },
+
+    # ── Otros formatos populares ───────────────────────────────────────────
+    {
+        "name": "Java Archive (JAR)",
+        "ext": "jar",
+        "header": b"PK\x03\x04",
+        "footer": b"PK\x05\x06",
+        "max_size": 200 * 1024 * 1024,
+    },
+    {
+        "name": "Android APK",
+        "ext": "apk",
+        "header": b"PK\x03\x04",
+        "footer": b"PK\x05\x06",
+        "max_size": 500 * 1024 * 1024,
+    },
+    {
+        "name": "Torrent",
+        "ext": "torrent",
+        "header": b"d8:announce",
+        "footer": b"ee",
+        "max_size": 2 * 1024 * 1024,
+    },
+    {
+        "name": "Email (EML)",
+        "ext": "eml",
+        "header": b"From ",
+        "footer": None,
+        "max_size": 20 * 1024 * 1024,
+    },
+    {
+        "name": "Email (Outlook MSG)",
+        "ext": "msg",
+        "header": b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1",
+        "footer": None,
+        "max_size": 50 * 1024 * 1024,
+    },
+    {
+        "name": "Outlook PST / OST",
+        "ext": "pst",
+        "header": b"!BDN",
+        "footer": None,
+        "max_size": 2 * 1024 * 1024 * 1024,
+    },
+    {
+        "name": "Firefox / Chrome Cookie DB",
+        "ext": "db",
+        "header": b"SQLite format 3\x00",
+        "footer": None,
+        "max_size": 50 * 1024 * 1024,
+    },
+    {
+        "name": "Chrome History (LevelDB LLOG)",
+        "ext": "log",
+        "header": b"\xEF\xBF\xBD\xEF\xBF\xBD",
+        "footer": None,
+        "max_size": 10 * 1024 * 1024,
+    },
+    {
+        "name": "Thumbcache (Windows)",
+        "ext": "db",
+        "header": b"CMMM",
+        "footer": None,
+        "max_size": 50 * 1024 * 1024,
+    },
+    {
+        "name": "Flash SWF",
+        "ext": "swf",
+        "header": b"CWS",
+        "footer": None,
+        "max_size": 30 * 1024 * 1024,
+    },
+    {
+        "name": "Flash SWF (uncompressed)",
+        "ext": "swf",
+        "header": b"FWS",
+        "footer": None,
+        "max_size": 30 * 1024 * 1024,
     },
 ]
 

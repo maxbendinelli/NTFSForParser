@@ -84,7 +84,18 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 - `recover <id> <ruta_destino>`: Realiza un file carving simple para archivos borrados en FAT32, asumiendo contigüidad basándose en el registro original de su tamaño y clúster inicial.
 - `dump_clusters <inicio> <fin | +cantidad> <destino>` (o `dump_blocks`): Extrae un rango directo de clústeres o bloques crudos del disco. Ej: `dump_clusters 100 +50 out.bin`.
 - `search [-r] <patron>`: Busca un texto o expresión regular (-r) a lo largo de toda la partición. Soporta automáticamente codificación ASCII/UTF-8 y UTF-16LE (común en MFT). Extrae el contexto y su offset físico.
-- `carve [directorio_destino] [tipos...]`: Realiza **File Carving automatizado** sobre la partición cruda buscando firmas de Magic Bytes. Recupera JPEGs, PNGs, PDFs, ZIPs, EXEs, GIFs, RARs, MP3s, bases de datos SQLite y binarios ELF. El directorio es opcional: si se omite, guarda en el directorio de trabajo actual. Filtra por tipo: `carve jpg pdf` o `carve ./out jpg pdf`.
+- `carve [directorio_destino] [tipos...]`: Realiza **File Carving automatizado** sobre la partición cruda buscando firmas de Magic Bytes. El directorio es opcional (por defecto: directorio actual). Se puede filtrar por tipo: `carve jpg pdf` o `carve ./out mkv mp4`.
+  - **Imágenes:** `jpg` `png` `gif` `bmp` `tif` `webp` `ico` `psd`
+  - **Audio:** `mp3` `wav` `flac` `ogg` `m4a` `mid`
+  - **Vídeo:** `mp4` `avi` `mkv` `flv` `mpg` `wmv`
+  - **Documentos:** `pdf` `docx` `doc` `rtf` `xml` `html` `odt`
+  - **Comprimidos:** `zip` `rar` `7z` `gz` `bz2` `xz` `tar` `iso` `vmdk`
+  - **Ejecutables:** `exe` `elf` `macho` `class` `pyc` `wasm`
+  - **BD / Registros Windows:** `db` `hive` `evt` `evtx` `pf` `lnk` `dmp`
+  - **Forenses / Red:** `pcap` `pcapng`
+  - **Crypto / Claves:** `cer` `pem` `pgp`
+  - **Email / Office:** `eml` `msg` `pst`
+  - **Otros:** `ttf` `woff` `jar` `apk` `torrent` `swf`
 - `find_orphans [limite]`: Escanea la MFT (NTFS) en busca de archivos huérfanos (cuyo directorio padre ha sido borrado o no existe).
 
 ### Sistemas Ext4 (Linux)
