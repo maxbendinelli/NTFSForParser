@@ -230,40 +230,49 @@ class E01ImageSource(DataSource):
         return result
 
     def get_chunk_count(self) -> int:
-        """Devuelve el número de chunks/segmentos del contenedor E01, o 0 si no disponible."""
+        """Devuelve el número de chunks del contenedor E01.
+        Intenta get_number_of_chunks(); si no está disponible, lo estima
+        a partir del tamaño de imagen y el tamaño de chunk por defecto de EWF (32 KB).
+        """
         try:
-            return self.ewf_handle.get_number_of_chunks()
+            n = self.ewf_handle.get_number_of_chunks()
+            if n and n > 0:
+                return n
         except Exception:
-            try:
-                return self.ewf_handle.chunk_count
-            except Exception:
-                return 0
+            pass
+        try:
+            n = self.ewf_handle.chunk_count
+            if n and n > 0:
+                return n
+        except Exception:
+            pass
+        # Estimacion: EWF usa chunks de 32 KB por defecto
+        ewf_default_chunk = 32 * 1024
+        return (self._size + ewf_default_chunk - 1) // ewf_default_chunk
 
     def verify_internal_checksums(self) -> tuple:
         """
         Verifica los checksums internos (CRC por chunk) del contenedor E01
-        usando pyewf. Devuelve (ok: bool, errores: list[str]).
+        usando pyewf. Devuelve (ok: bool, mensajes: list[str]).
         """
         errors = []
         try:
-            # pyewf expone check_chunk() en algunas versiones
             chunk_count = self.get_chunk_count()
             if chunk_count == 0:
-                return (True, ["No se pudo obtener el número de chunks para verificación interna."])
+                return (True, ["No se pudo determinar el numero de chunks."])
 
             for i in range(chunk_count):
                 try:
                     ok = self.ewf_handle.check_chunk(i)
                     if not ok:
-                        errors.append(f"Chunk {i} falló la verificación CRC interna.")
+                        errors.append(f"Chunk {i} fallo la verificacion CRC interna.")
                 except AttributeError:
-                    # pyewf en esta versión no expone check_chunk(); no es error del usuario.
-                    return (True, ["verify_internal: check_chunk() no disponible en esta versión de pyewf."])
+                    return (True, ["check_chunk() no disponible en esta version de pyewf (la verificacion CRC interna requiere libewf >= 20140807)."])
                 except Exception as e:
                     errors.append(f"Chunk {i}: error ({e})")
 
         except Exception as e:
-            return (False, [f"Error durante verificación interna: {e}"])
+            return (False, [f"Error durante verificacion interna: {e}"])
 
         return (len(errors) == 0, errors)
 
