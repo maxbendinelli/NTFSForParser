@@ -84,7 +84,7 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 - `recover <id> <ruta_destino>`: Realiza un file carving simple para archivos borrados en FAT32, asumiendo contigüidad basándose en el registro original de su tamaño y clúster inicial.
 - `dump_clusters <inicio> <fin | +cantidad> <destino>` (o `dump_blocks`): Extrae un rango directo de clústeres o bloques crudos del disco. Ej: `dump_clusters 100 +50 out.bin`.
 - `search [-r] <patron>`: Busca un texto o expresión regular (-r) a lo largo de toda la partición. Soporta automáticamente codificación ASCII/UTF-8 y UTF-16LE (común en MFT). Extrae el contexto y su offset físico.
-- `carve <directorio_destino> [tipos...]`: Realiza **File Carving automatizado** sobre la partición cruda buscando firmas de Magic Bytes. Recupera JPEGs, PNGs, PDFs, ZIPs, EXEs, GIFs, RARs, MP3s, bases de datos SQLite y binarios ELF. Opcionalmente filtra por tipo: `carve ./out jpg pdf png`.
+- `carve [directorio_destino] [tipos...]`: Realiza **File Carving automatizado** sobre la partición cruda buscando firmas de Magic Bytes. Recupera JPEGs, PNGs, PDFs, ZIPs, EXEs, GIFs, RARs, MP3s, bases de datos SQLite y binarios ELF. El directorio es opcional: si se omite, guarda en el directorio de trabajo actual. Filtra por tipo: `carve jpg pdf` o `carve ./out jpg pdf`.
 - `find_orphans [limite]`: Escanea la MFT (NTFS) en busca de archivos huérfanos (cuyo directorio padre ha sido borrado o no existe).
 
 ### Sistemas Ext4 (Linux)

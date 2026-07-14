@@ -1186,26 +1186,38 @@ class NTFSShell(cmd.Cmd):
 
 
     def do_carve(self, arg):
-        """Realiza File Carving automatizado buscando Magic Bytes en la partición. Uso: carve <directorio_destino> [tipos...]
+        """Realiza File Carving automatizado buscando Magic Bytes en la partición.
 
-        Ejemplos:
-          carve ./recuperados            → busca todos los tipos soportados
-          carve ./recuperados jpg pdf    → busca solo JPEG y PDF
+        Uso:
+          carve                          → guarda en el directorio actual, todos los tipos
+          carve <directorio_destino>     → guarda en el directorio indicado, todos los tipos
+          carve [dir] jpg pdf png        → filtra tipos específicos
 
         Tipos soportados: jpg, png, pdf, zip, exe, gif, rar, mp3, db, elf
+        Si no se especifica directorio, se usa el directorio de trabajo actual.
         """
+        import os
         if not self.current_parser:
             print(_("Selecciona una partición válida primero."))
             return
 
-        args = arg.split()
-        if not args:
-            print("Uso: carve <directorio_destino> [tipos...]")
-            print("Ejemplo: carve ./recuperados jpg pdf png")
-            return
+        KNOWN_TYPES = {s["ext"].lower() for s in SIGNATURES}
 
-        output_dir = args[0]
-        filter_types = [t.lower() for t in args[1:]] if len(args) > 1 else []
+        args = arg.split()
+
+        # Detectar si el primer argumento es un tipo conocido o un directorio
+        if not args:
+            # Sin argumentos: usar directorio actual
+            output_dir = os.getcwd()
+            filter_types = []
+        elif args[0].lower() in KNOWN_TYPES:
+            # El primer arg ya es un tipo de archivo, no un directorio
+            output_dir = os.getcwd()
+            filter_types = [t.lower() for t in args]
+        else:
+            # El primer arg es el directorio destino
+            output_dir = args[0]
+            filter_types = [t.lower() for t in args[1:]]
 
         # Filtrar firmas según los tipos solicitados
         if filter_types:
