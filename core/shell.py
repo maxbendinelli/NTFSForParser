@@ -1033,48 +1033,88 @@ class NTFSShell(cmd.Cmd):
         self.do_dump_clusters(arg)
 
     def do_recover(self, arg):
-        """Recupera un archivo borrado en FAT asumiendo que sus clústeres son contiguos. Uso: recover <id> <ruta_destino>"""
+        """Recupera un archivo borrado reconstruyéndolo a partir de metadatos (FAT/NTFS). Uso: recover <id> <ruta_destino>"""
         args = arg.split()
         if len(args) < 2:
-            print("Uso: recover <id> <ruta_destino>")
+            print(_("Uso: recover <id> <ruta_destino>"))
             return
             
         try:
-            file_id = int(args[0])
+            target = args[0]
             dest = args[1]
+            stream_name = ""
             
-            if not isinstance(self.current_parser, FATParser):
-                print("El comando 'recover' actualmente está diseñado para recuperación contigua en FAT.")
-                return
+            if ":" in target:
+                parts = target.split(":", 1)
+                target = parts[0]
+                stream_name = parts[1].lower()
                 
-            if file_id < 0 or file_id >= len(self.fat_files_cache):
-                print("ID fuera de rango. Ejecuta 'ls' primero.")
-                return
-                
-            entry = self.fat_files_cache[file_id]
-            if not entry.is_deleted:
-                print("El archivo no está borrado. Usa 'extract' en su lugar.")
-                return
-                
-            if entry.size == 0 or entry.start_cluster < 2:
-                print("El archivo borrado tiene tamaño 0 o no tiene clúster asignado.")
-                return
-                
-            # Recuperación contigua (Carving a ciegas basado en el metadata borrado)
-            print(f"[+] Intentando recuperación de '{entry.name}' (Clúster inicio: {entry.start_cluster}, Tamaño: {entry.size} bytes)...")
+            file_id = int(target)
+            data_content = None
             
-            offset = self.current_parser.get_cluster_offset(entry.start_cluster)
-            data_content = self.data_source.read(offset, entry.size)
-            
-            with open(dest, 'wb') as f:
-                f.write(data_content)
+            if isinstance(self.current_parser, NTFSParser):
+                record = self.current_parser.get_mft_record(file_id)
+                record.parse_attributes()
                 
-            print(f"[+] ¡Archivo recuperado en {dest}! Verifica si el contenido es válido (si estaba fragmentado, el contenido podría estar corrupto).")
+                # Verificar si está borrado
+                if record.is_in_use():
+                    print(_("[!] Alerta: El registro MFT {id} está marcado como ACTIVO (no borrado).").format(id=file_id))
+                    print(_("    Para archivos activos se recomienda usar el comando 'extract'."))
+                    print(_("    Procediendo igualmente con la recuperación..."))
+                
+                selected_stream = None
+                for s in record.data_streams:
+                    if (not stream_name and not s['name']) or (stream_name and s['name'].lower() == stream_name):
+                        selected_stream = s
+                        break
+                        
+                if not selected_stream:
+                    print(_("Flujo de datos '{stream}' no encontrado en el archivo.").format(stream=stream_name))
+                    return
+                    
+                print(_("[+] Recuperando archivo borrado en NTFS desde el registro MFT {id}...").format(id=file_id))
+                if selected_stream['is_resident']:
+                    data_content = selected_stream['content']
+                    print(_("    -> Tipo: Residente (datos guardados dentro de la MFT)"))
+                else:
+                    data_content = self.current_parser.read_data_runs(selected_stream['runs'], selected_stream['size'])
+                    print(_("    -> Tipo: No Residente (reconstruido mediante {count} fragmentos/runs)").format(count=len(selected_stream['runs'])))
+                    
+            elif isinstance(self.current_parser, FATParser):
+                if file_id < 0 or file_id >= len(self.fat_files_cache):
+                    print(_("ID fuera de rango. Ejecuta 'ls' primero."))
+                    return
+                entry = self.fat_files_cache[file_id]
+                if not entry.is_deleted:
+                    print(_("El archivo no está borrado. Usa 'extract' en su lugar."))
+                    return
+                    
+                if entry.size == 0 or entry.start_cluster < 2:
+                    print(_("El archivo borrado tiene tamaño 0 o no tiene clúster asignado."))
+                    return
+                    
+                # Recuperación contigua (FAT32 no retiene cadena FAT para borrados)
+                print(_("[+] Intentando recuperación contigua en FAT32 de '{name}' (Inicio: {cluster}, Tamaño: {size} bytes)...").format(
+                    name=entry.name, cluster=entry.start_cluster, size=entry.size
+                ))
+                offset = self.current_parser.get_cluster_offset(entry.start_cluster)
+                data_content = self.data_source.read(offset, entry.size)
+                
+            else:
+                print(_("[!] La recuperación de borrados basada en metadatos no está disponible para este sistema de archivos."))
+                return
+
+            if data_content is not None:
+                with open(dest, 'wb') as f:
+                    f.write(data_content)
+                print(_("[+] ¡Archivo recuperado con éxito en {dest}!").format(dest=dest))
+            else:
+                print(_("[!] No se pudo extraer contenido para la recuperación."))
                 
         except ValueError:
-            print("Uso: recover <id> <ruta_destino>")
+            print(_("Uso: recover <id> <ruta_destino>"))
         except Exception as e:
-            print(f"Error al recuperar archivo: {e}")
+            print(_("Error al recuperar archivo: {error}").format(error=e))
 
     def do_find_orphans(self, arg):
         """Busca archivos huérfanos en NTFS (cuyo directorio padre fue borrado). Uso: find_orphans [limite_escaneo]"""

@@ -84,7 +84,7 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 ### Lectura y Recuperación de Evidencia
 - `cat <nombre | id | sector X | cluster Y>`: Imprime por consola el texto o vuelca el hexdump de un archivo o bloque de disco. Soporta sintaxis `cat id:stream_name` para extraer ADS. Ensambla archivos No-Residentes.
 - `extract <id> <ruta_destino>`: Copia de forma forense el archivo (residente o no-residente) desde la imagen de disco hacia tu PC.
-- `recover <id> <ruta_destino>`: Realiza un file carving simple para archivos borrados en FAT32, asumiendo contigüidad basándose en el registro original de su tamaño y clúster inicial.
+- `recover <id> <ruta_destino>`: Recupera un archivo borrado utilizando metadatos estructurados. **Para NTFS**: reconstruye el archivo completo respetando su fragmentación original a partir de los Data Runs/atributos del registro MFT (incluso si está inactivo/borrado). **Para FAT32**: realiza una extracción contigua a partir del clúster de inicio y el tamaño original del archivo.
 - `dump_clusters <inicio> <fin | +cantidad> <destino>` (o `dump_blocks`): Extrae un rango directo de clústeres o bloques crudos del disco. Ej: `dump_clusters 100 +50 out.bin`.
 - `search [-r] <patron>`: Busca un texto o expresión regular (-r) a lo largo de toda la partición. Soporta automáticamente codificación ASCII/UTF-8 y UTF-16LE (común en MFT). Extrae el contexto y su offset físico.
 - `carve [directorio_destino] [tipos...]`: Realiza **File Carving automatizado** sobre la partición cruda buscando firmas de Magic Bytes. El directorio es opcional (por defecto: directorio actual). Se puede filtrar por tipo: `carve jpg pdf` o `carve ./out mkv mp4`.

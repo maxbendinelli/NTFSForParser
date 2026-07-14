@@ -153,5 +153,16 @@
     "No hay metadatos adicionales disponibles para este formato de imagen (Solo disponible en E01).": "No additional metadata available for this image format (Only available in E01).",
     "\n[+] Metadatos de la Imagen Forense:": "\n[+] Forensic Image Metadata:",
     "\n[+] Detectado Protective MBR (0xEE). Saltando al LBA 1 para parsear GPT...": "\n[+] Protective MBR (0xEE) detected. Jumping to LBA 1 to parse GPT...",
-    "Alerta: Partición MBR indica GPT (0xEE) pero la firma 'EFI PART' no se encontró en LBA 1.": "Warning: MBR partition indicates GPT (0xEE) but 'EFI PART' signature was not found on LBA 1."
+    "Alerta: Partición MBR indica GPT (0xEE) pero la firma 'EFI PART' no se encontró en LBA 1.": "Warning: MBR partition indicates GPT (0xEE) but 'EFI PART' signature was not found on LBA 1.",
+
+    "[!] Alerta: El registro MFT {id} está marcado como ACTIVO (no borrado).": "[!] Alert: MFT record {id} is marked as ACTIVE (not deleted).",
+    "    Para archivos activos se recomienda usar el comando 'extract'.": "    For active files, using 'extract' command is recommended.",
+    "    Procediendo igualmente con la recuperación...": "    Proceeding with recovery anyway...",
+    "[+] Recuperando archivo borrado en NTFS desde el registro MFT {id}...": "[+] Recovering deleted NTFS file from MFT record {id}...",
+    "    -> Tipo: Residente (datos guardados dentro de la MFT)": "    -> Type: Resident (data stored within the MFT)",
+    "    -> Tipo: No Residente (reconstruido mediante {count} fragmentos/runs)": "    -> Type: Non-Resident (reconstructed from {count} fragments/runs)",
+    "[+] Intentando recuperación contigua en FAT32 de '{name}' (Inicio: {cluster}, Tamaño: {size} bytes)...": "[+] Attempting contiguous FAT32 recovery of '{name}' (Start: {cluster}, Size: {size} bytes)...",
+    "[!] La recuperación de borrados basada en metadatos no está disponible para este sistema de archivos.": "[!] Metadata-based deleted recovery is not available for this file system.",
+    "[+] ¡Archivo recuperado con éxito en {dest}!": "[+] File recovered successfully to {dest}!",
+    "[!] No se pudo extraer contenido para la recuperación.": "[!] Could not extract content for recovery."
 }
