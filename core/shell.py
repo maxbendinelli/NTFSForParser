@@ -117,27 +117,26 @@ class NTFSShell(cmd.Cmd):
                 chunk_count = self.data_source.get_chunk_count()
                 if chunk_count:
                     print(f"    Chunks totales : {chunk_count:,}")
-                if ok:
-                    print(f"    Estado CRC     : ✓ Todos los chunks pasaron la verificación interna.")
+                if ok:\n                    print(f"    Estado CRC     : [OK] Todos los chunks pasaron la verificacion interna.")
                 else:
-                    print(f"    Estado CRC     : ✗ Se detectaron errores en {len(crc_msgs)} chunk(s):")
+                    print(f"    Estado CRC     : [!!] Se detectaron errores en {len(crc_msgs)} chunk(s):")
                     for msg in crc_msgs[:10]:
                         print(f"        - {msg}")
                     if len(crc_msgs) > 10:
-                        print(f"        ... y {len(crc_msgs)-10} más.")
+                        print(f"        ... y {len(crc_msgs)-10} mas.")
                 if crc_msgs and ok:
                     # Mensajes informativos (no errores)
                     for msg in crc_msgs:
                         print(f"    Info: {msg}")
             except Exception as e:
-                print(f"    [!] Error durante verificación CRC: {e}")
+                print(f"    [!] Error durante verificacion CRC: {e}")
         else:
-            print("\n[1/2] (Formato RAW/DD — sin hashes ni CRC almacenados en el archivo)\n")
+            print("\n[1/2] (Formato RAW/DD - sin hashes ni CRC almacenados en el archivo)\n")
 
-        # ── Paso 3: Cálculo de hashes sobre los datos reales ───────────────
+        # Paso 3: Calculo de hashes sobre los datos reales
         step_label = "[3/3]" if is_e01 else "[2/2]"
         print(f"\n{step_label} Calculando hashes sobre los datos reales de la imagen...")
-        print("    Esto puede tardar varios minutos en imágenes grandes.\n")
+        print("    Esto puede tardar varios minutos en imagenes grandes.\n")
 
         import hashlib
 
@@ -164,11 +163,11 @@ class NTFSShell(cmd.Cmd):
                 sys.stdout.flush()
                 spinner_idx += 1
 
-            sys.stdout.write(f"\r    Leyendo: [{'='*40}] 100% ✓\n\n")
+            sys.stdout.write(f"\r    Leyendo: [{'='*40}] 100% DONE\n\n")
 
             calculated = {alg: h.hexdigest() for alg, h in hashers.items()}
 
-            # ── Paso 4: Reporte final ──────────────────────────────────────
+            # Reporte final
             print(f"{'='*60}")
             print("  RESULTADO")
             print(f"{'='*60}")
@@ -179,7 +178,6 @@ class NTFSShell(cmd.Cmd):
                 print(f"    Calculado : {calc_val}")
 
                 stored = None
-                # Buscar en stored_hashes con variantes del nombre
                 for k in stored_hashes:
                     if alg in k.lower():
                         stored = stored_hashes[k]
@@ -188,23 +186,23 @@ class NTFSShell(cmd.Cmd):
                 if stored:
                     print(f"    Almacenado: {stored}")
                     if calc_val.lower() == stored.lower():
-                        print(f"    Veredicto : ✓ COINCIDEN — Imagen íntegra.")
+                        print(f"    Veredicto : [OK] COINCIDEN - Imagen integra.")
                     else:
-                        print(f"    Veredicto : ✗ NO COINCIDEN — ¡Posible alteración o corrupción!")
+                        print(f"    Veredicto : [!!] NO COINCIDEN - Posible alteracion o corrupcion!")
                         all_ok = False
                 else:
                     if is_e01:
                         print(f"    Almacenado: (no disponible para {alg.upper()} en este contenedor)")
                     else:
-                        print(f"    Almacenado: (N/A — imagen RAW sin hash de referencia)")
+                        print(f"    Almacenado: (N/A - imagen RAW sin hash de referencia)")
 
             if is_e01 and stored_hashes:
                 print(f"\n{'='*60}")
                 if all_ok:
-                    print("  [✓] VERIFICACIÓN COMPLETA: La cadena de custodia está INTACTA.")
+                    print("  [OK] VERIFICACION COMPLETA: La cadena de custodia esta INTACTA.")
                 else:
-                    print("  [✗] ALERTA FORENSE: La imagen NO supera la verificación de integridad.")
-                    print("      Documenta este resultado y NO uses esta imagen como evidencia.")
+                    print("  [!!] ALERTA FORENSE: La imagen NO supera la verificacion de integridad.")
+                    print("       Documenta este resultado y NO uses esta imagen como evidencia.")
                 print(f"{'='*60}\n")
 
         except Exception as e:

@@ -11,6 +11,14 @@ from core.utils import hexdump, print_breakdown
 import argparse
 from core.i18n import set_language, _
 
+# Forzar codificacion UTF-8 de forma segura para compatibilidad multiplataforma
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, 'reconfigure'):
+        try:
+            stream.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+
 def main():
     parser = argparse.ArgumentParser(description="NTFSForParser - Framework Educativo Forense")
     parser.add_argument("image_path", help="Ruta a la imagen (.dd, .001, .e01) o dispositivo físico (\\\\.\\PhysicalDrive0)")

@@ -153,7 +153,12 @@ class E01ImageSource(DataSource):
         try:
             import pyewf
         except ImportError:
-            raise ImportError("La librería 'pyewf' es necesaria para leer archivos E01. Instálala o compílala para tu sistema.")
+            raise ImportError(
+                "La libreria 'pyewf' es necesaria para leer archivos E01.\n"
+                "  - En Windows: ejecute 'pip install libewf-python'\n"
+                "  - En Linux/macOS: instale libewf-dev usando su gestor de paquetes "
+                "(ej. apt, brew) y luego ejecute 'pip install pyewf'"
+            )
 
         self.file_path = file_path
         self.filenames = pyewf.glob(file_path)  # Encuentra todos los segmentos (E01, E02, …)
