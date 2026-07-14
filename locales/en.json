@@ -148,5 +148,10 @@
     "\n    {'#':<6} | {'Tipo':<22} | {'Offset':<14} | {'Tamaño':<12} | {'Footer':<8} | Nombre": "\n    {'#':<6} | {'Type':<22} | {'Offset':<14} | {'Size':<12} | {'Footer':<8} | Name",
     "\n    Todos los archivos se guardaron en: {dir}": "\n    All files were saved to: {dir}",
     "    No se encontraron archivos con las firmas especificadas.": "    No files found with the specified signatures.",
-    "[!] Error durante el carving: {error}": "[!] Error during carving: {error}"
+    "[!] Error durante el carving: {error}": "[!] Error during carving: {error}",
+
+    "No hay metadatos adicionales disponibles para este formato de imagen (Solo disponible en E01).": "No additional metadata available for this image format (Only available in E01).",
+    "\n[+] Metadatos de la Imagen Forense:": "\n[+] Forensic Image Metadata:",
+    "\n[+] Detectado Protective MBR (0xEE). Saltando al LBA 1 para parsear GPT...": "\n[+] Protective MBR (0xEE) detected. Jumping to LBA 1 to parse GPT...",
+    "Alerta: Partición MBR indica GPT (0xEE) pero la firma 'EFI PART' no se encontró en LBA 1.": "Warning: MBR partition indicates GPT (0xEE) but 'EFI PART' signature was not found on LBA 1."
 }

@@ -55,10 +55,10 @@ class NTFSShell(cmd.Cmd):
         """Muestra los metadatos de la imagen (E01) u otra información general."""
         metadata = self.data_source.get_metadata()
         if not metadata:
-            print("No hay metadatos adicionales disponibles para este formato de imagen (Solo disponible en E01).")
+            print(_("No hay metadatos adicionales disponibles para este formato de imagen (Solo disponible en E01)."))
             return
             
-        print("\n[+] Metadatos de la Imagen Forense:")
+        print(_("\n[+] Metadatos de la Imagen Forense:"))
         for k, v in metadata.items():
             # Traducir o limpiar las claves si es necesario, por ahora se muestran directo
             print(f"    - {k}: {v.decode('utf-8') if isinstance(v, bytes) else v}")

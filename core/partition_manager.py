@@ -2,6 +2,7 @@ import struct
 import uuid
 from dataclasses import dataclass
 from core.data_source import DataSource
+from core.i18n import _
 
 @dataclass
 class Partition:
@@ -93,7 +94,7 @@ class MBRParser:
             
         # Detección de GPT (GUID Partition Table)
         if len(self.partitions) > 0 and self.partitions[0].type_code == 0xEE:
-            print("\n[+] Detectado Protective MBR (0xEE). Saltando al LBA 1 para parsear GPT...")
+            print(_("\n[+] Detectado Protective MBR (0xEE). Saltando al LBA 1 para parsear GPT..."))
             self.partitions.clear()
             self._parse_gpt()
 
@@ -102,7 +103,7 @@ class MBRParser:
         gpt_header = self.data_source.read(self.sector_size, self.sector_size)
         signature = gpt_header[0:8]
         if signature != b'EFI PART':
-            print("Alerta: Partición MBR indica GPT (0xEE) pero la firma 'EFI PART' no se encontró en LBA 1.")
+            print(_("Alerta: Partición MBR indica GPT (0xEE) pero la firma 'EFI PART' no se encontró en LBA 1."))
             return
             
         entries_lba = struct.unpack('<Q', gpt_header[72:80])[0]
