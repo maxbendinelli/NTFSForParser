@@ -65,11 +65,13 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 - `select <num>`: Activa y monta internamente una de las particiones listadas.
 - `imageinfo`: Imprime todos los metadatos forenses almacenados por el perito si la imagen es un contenedor EnCase (.e01).
 - `hash_check [md5|sha1|sha256|all]`: Verifica la integridad de la imagen cargada. **Para E01**: (1) lee los hashes almacenados en el contenedor (MD5/SHA1), (2) verifica los CRC internos por chunk, (3) calcula los hashes reales y los compara — emitiendo veredicto sobre la cadena de custodia. **Para RAW/DD**: calcula y muestra los hashes sin referencia.
+- `exit` (o `quit`): Cierra la consola y finaliza la sesión de análisis interactivo.
 
 ### Inspección de Bajo Nivel
 - `hexdump <offset>`: Volcado hexadecimal puro desde el inicio del archivo.
 - `sector <lba>`: Muestra el contenido físico en el LBA (Logical Block Addressing) indicado.
 - `cluster <num>`: Muestra el clúster lógico calculando los offsets relativos a la partición actual.
+- `go sector <num>` (o `cluster`): Atajo rápido para saltar e inspeccionar un sector o clúster directamente.
 - `identify sector <num>` (o `cluster`): Lee los Magic Bytes y firmas de la cabecera e intenta adivinar qué estructura es (VBR, Registro MFT, Inicio de PDF, Zip, JPEG, etc).
 
 ### Navegación del File System (FAT / NTFS / Ext4)
