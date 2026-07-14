@@ -109,7 +109,7 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 
 - ✅ ~~**Verificación Completa E01**~~: Implementado — `hash_check` lee los hashes almacenados en el contenedor E01 (MD5/SHA1), verifica los CRC internos por chunk y compara contra el hash calculado en tiempo real. Soporta también SHA256 como argumento opcional.
 - ✅ ~~**File Carving Automatizado**~~: Implementado — usa `carve <dir> [tipos...]` para recuperar archivos eliminados por Magic Bytes (JPG, PNG, PDF, ZIP, EXE, GIF, RAR, MP3, SQLite, ELF).
-- **Expansión de Idiomas (i18n)**: Continuar la traducción del 100% de los subsistemas y parsers de bajo nivel al motor de diccionarios multi-idioma (Inglés/Español).
+- ✅ ~~**Expansión de Idiomas (i18n)**~~: Implementado — soporte completo del 100% de los comandos interactivos, errores, metadatos y parsers de particiones en Español e Inglés. Se puede inicializar con el parámetro `--lang en`.
 
 ---
 
