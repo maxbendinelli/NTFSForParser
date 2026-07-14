@@ -88,55 +88,56 @@ class NTFSShell(cmd.Cmd):
         is_e01 = isinstance(self.data_source, E01ImageSource)
 
         print(f"\n{'='*60}")
-        print(f"  VERIFICACIÓN DE INTEGRIDAD DE IMAGEN FORENSE")
+        print(_("  VERIFICACION DE INTEGRIDAD DE IMAGEN FORENSE"))
         print(f"{'='*60}")
-        print(f"  Formato  : {'E01 (EnCase)' if is_e01 else 'RAW / DD / Split'}")
-        print(f"  Algoritmos: {', '.join(a.upper() for a in algos)}")
+        print(_("  Formato  : {formato}").format(formato='E01 (EnCase)' if is_e01 else 'RAW / DD / Split'))
+        print(_("  Algoritmos: {algos}").format(algos=', '.join(a.upper() for a in algos)))
         total_size = self.data_source.get_size()
-        print(f"  Tamaño   : {total_size / (1024**3):.3f} GB ({total_size:,} bytes)")
+        print(_("  Tamaño   : {size:.3f} GB ({bytes_val:,} bytes)").format(size=total_size / (1024**3), bytes_val=total_size))
         print(f"{'='*60}")
 
         # ── Paso 1: Hashes almacenados en E01 (antes de calcular) ─────────
         stored_hashes = {}
         if is_e01:
-            print("\n[1/3] Leyendo hashes almacenados en el contenedor E01...")
+            print(_("\n[1/3] Leyendo hashes almacenados en el contenedor E01..."))
             try:
                 stored_hashes = self.data_source.get_hash_values()
                 if stored_hashes:
                     for alg, val in stored_hashes.items():
-                        print(f"    Hash almacenado ({alg.upper():6}): {val}")
+                        print(_("    Hash almacenado ({alg}): {val}").format(alg=alg.upper(), val=val))
                 else:
-                    print("    [!] No se encontraron hashes almacenados en el contenedor E01.")
+                    print(_("    [!] No se encontraron hashes almacenados en el contenedor E01."))
             except Exception as e:
-                print(f"    [!] Error al leer hashes del contenedor: {e}")
+                print(_("    [!] Error al leer hashes del contenedor: {error}").format(error=e))
 
             # ── Paso 2: Verificación de CRC internos por chunk ─────────────
-            print("\n[2/3] Verificando checksums internos por chunk (CRC E01)...")
+            print(_("\n[2/3] Verificando checksums internos por chunk (CRC E01)..."))
             try:
                 ok, crc_msgs = self.data_source.verify_internal_checksums()
                 chunk_count = self.data_source.get_chunk_count()
                 if chunk_count:
-                    print(f"    Chunks totales : {chunk_count:,}")
-                if ok:\n                    print(f"    Estado CRC     : [OK] Todos los chunks pasaron la verificacion interna.")
+                    print(_("    Chunks totales : {count:,}").format(count=chunk_count))
+                if ok:
+                    print(_("    Estado CRC     : [OK] Todos los chunks pasaron la verificacion interna."))
                 else:
-                    print(f"    Estado CRC     : [!!] Se detectaron errores en {len(crc_msgs)} chunk(s):")
+                    print(_("    Estado CRC     : [!!] Se detectaron errores en {count} chunk(s):").format(count=len(crc_msgs)))
                     for msg in crc_msgs[:10]:
                         print(f"        - {msg}")
                     if len(crc_msgs) > 10:
-                        print(f"        ... y {len(crc_msgs)-10} mas.")
+                        print(_("        ... y {count} mas.").format(count=len(crc_msgs)-10))
                 if crc_msgs and ok:
                     # Mensajes informativos (no errores)
                     for msg in crc_msgs:
-                        print(f"    Info: {msg}")
+                        print(_("    Info: {msg}").format(msg=msg))
             except Exception as e:
-                print(f"    [!] Error durante verificacion CRC: {e}")
+                print(_("    [!] Error durante verificacion CRC: {error}").format(error=e))
         else:
-            print("\n[1/2] (Formato RAW/DD - sin hashes ni CRC almacenados en el archivo)\n")
+            print(_("\n[1/2] (Formato RAW/DD - sin hashes ni CRC almacenados en el archivo)\n"))
 
         # Paso 3: Calculo de hashes sobre los datos reales
         step_label = "[3/3]" if is_e01 else "[2/2]"
-        print(f"\n{step_label} Calculando hashes sobre los datos reales de la imagen...")
-        print("    Esto puede tardar varios minutos en imagenes grandes.\n")
+        print(_("\n{step_label} Calculando hashes sobre los datos reales de la imagen...").format(step_label=step_label))
+        print(_("    Esto puede tardar varios minutos en imagenes grandes.\n"))
 
         import hashlib
 
@@ -159,23 +160,23 @@ class NTFSShell(cmd.Cmd):
                 filled  = int(40 * percent // 100)
                 bar     = '=' * filled + '-' * (40 - filled)
                 spin    = spinner[spinner_idx % 4]
-                sys.stdout.write(f"\r    Leyendo: [{bar}] {percent:3d}% {spin}")
+                sys.stdout.write(_("\r    Leyendo: [{bar}] {percent:3d}% {spin}").format(bar=bar, percent=percent, spin=spin))
                 sys.stdout.flush()
                 spinner_idx += 1
 
-            sys.stdout.write(f"\r    Leyendo: [{'='*40}] 100% DONE\n\n")
+            sys.stdout.write(_("\r    Leyendo: [{bar}] 100% DONE\n\n").format(bar='='*40))
 
             calculated = {alg: h.hexdigest() for alg, h in hashers.items()}
 
             # Reporte final
             print(f"{'='*60}")
-            print("  RESULTADO")
+            print(_("  RESULTADO"))
             print(f"{'='*60}")
 
             all_ok = True
             for alg, calc_val in calculated.items():
-                print(f"\n  {alg.upper()}:")
-                print(f"    Calculado : {calc_val}")
+                print(_("\n  {alg}:").format(alg=alg.upper()))
+                print(_("    Calculado : {val}").format(val=calc_val))
 
                 stored = None
                 for k in stored_hashes:
@@ -184,30 +185,30 @@ class NTFSShell(cmd.Cmd):
                         break
 
                 if stored:
-                    print(f"    Almacenado: {stored}")
+                    print(_("    Almacenado: {val}").format(val=stored))
                     if calc_val.lower() == stored.lower():
-                        print(f"    Veredicto : [OK] COINCIDEN - Imagen integra.")
+                        print(_("    Veredicto : [OK] COINCIDEN - Imagen integra."))
                     else:
-                        print(f"    Veredicto : [!!] NO COINCIDEN - Posible alteracion o corrupcion!")
+                        print(_("    Veredicto : [!!] NO COINCIDEN - Posible alteracion o corrupcion!"))
                         all_ok = False
                 else:
                     if is_e01:
-                        print(f"    Almacenado: (no disponible para {alg.upper()} en este contenedor)")
+                        print(_("    Almacenado: (no disponible para {alg} en este contenedor)").format(alg=alg.upper()))
                     else:
-                        print(f"    Almacenado: (N/A - imagen RAW sin hash de referencia)")
+                        print(_("    Almacenado: (N/A - imagen RAW sin hash de referencia)"))
 
             if is_e01 and stored_hashes:
                 print(f"\n{'='*60}")
                 if all_ok:
-                    print("  [OK] VERIFICACION COMPLETA: La cadena de custodia esta INTACTA.")
+                    print(_("  [OK] VERIFICACION COMPLETA: La cadena de custodia esta INTACTA."))
                 else:
-                    print("  [!!] ALERTA FORENSE: La imagen NO supera la verificacion de integridad.")
-                    print("       Documenta este resultado y NO uses esta imagen como evidencia.")
+                    print(_("  [!!] ALERTA FORENSE: La imagen NO supera la verificacion de integridad."))
+                    print(_("       Documenta este resultado y NO uses esta imagen como evidencia."))
                 print(f"{'='*60}\n")
 
         except Exception as e:
             sys.stdout.write("\n")
-            print(f"\n[!] Error durante el cálculo: {e}")
+            print(_("\n[!] Error durante el cálculo: {error}").format(error=e))
 
 
     def do_select(self, arg):
@@ -1307,18 +1308,18 @@ class NTFSShell(cmd.Cmd):
         if filter_types:
             custom_sigs = [s for s in SIGNATURES if s["ext"].lower() in filter_types]
             if not custom_sigs:
-                print(f"[!] Ningún tipo válido reconocido. Tipos disponibles: {', '.join(s['ext'] for s in SIGNATURES)}")
+                print(_("[!] Ningún tipo válido reconocido. Tipos disponibles: {tipos}").format(tipos=', '.join(s['ext'] for s in SIGNATURES)))
                 return
         else:
             custom_sigs = None  # Usar todas las firmas
 
         # Resumen previo
         sigs_to_use = custom_sigs if custom_sigs else SIGNATURES
-        print(f"\n[+] Iniciando File Carving automatizado en la partición {self.selected_partition}...")
-        print(f"    Directorio de salida : {output_dir}")
-        print(f"    Tipos a buscar       : {', '.join(s['name'] for s in sigs_to_use)}")
-        print(f"    Tamaño de partición  : {self.current_parser.partition.size_in_bytes / (1024**2):.2f} MB")
-        print("    Esto puede tardar varios minutos en particiones grandes.")
+        print(_("\n[+] Iniciando File Carving automatizado en la partición {part}...").format(part=self.selected_partition))
+        print(_("    Directorio de salida : {out_dir}").format(out_dir=output_dir))
+        print(_("    Tipos a buscar       : {types}").format(types=', '.join(s['name'] for s in sigs_to_use)))
+        print(_("    Tamaño de partición  : {size:.2f} MB").format(size=self.current_parser.partition.size_in_bytes / (1024**2)))
+        print(_("    Esto puede tardar varios minutos en particiones grandes."))
         print("-" * 80)
 
         spinner = ['|', '/', '-', '\\']
@@ -1344,24 +1345,24 @@ class NTFSShell(cmd.Cmd):
             results = carver.carve()
 
             sys.stdout.write("\n")
-            print(f"\n[+] Carving finalizado.")
-            print(f"    Archivos recuperados : {len(results)}")
-            print(f"    Saltados / errores   : {carver.skipped_count}")
+            print(_("\n[+] Carving finalizado."))
+            print(_("    Archivos recuperados : {count}").format(count=len(results)))
+            print(_("    Saltados / errores   : {count}").format(count=carver.skipped_count))
 
             if results:
-                print(f"\n    {'#':<6} | {'Tipo':<22} | {'Offset':<14} | {'Tamaño':<12} | {'Footer':<8} | Nombre")
+                print(_("\n    {'#':<6} | {'Tipo':<22} | {'Offset':<14} | {'Tamaño':<12} | {'Footer':<8} | Nombre").format())
                 print("    " + "-" * 90)
                 for r in results:
-                    footer_ok = "✓" if r["footer_found"] else "(truncado)"
+                    footer_ok = "[OK]" if r["footer_found"] else "[TRUNC]"
                     size_kb   = r["size"] / 1024
                     print(f"    {r['index']:<6} | {r['type']:<22} | {hex(r['abs_offset']):<14} | {size_kb:>8.1f} KB | {footer_ok:<10} | {r['filename']}")
-                print(f"\n    Todos los archivos se guardaron en: {output_dir}")
+                print(_("\n    Todos los archivos se guardaron en: {dir}").format(dir=output_dir))
             else:
-                print("    No se encontraron archivos con las firmas especificadas.")
+                print(_("    No se encontraron archivos con las firmas especificadas."))
 
         except Exception as e:
             sys.stdout.write("\n")
-            print(f"[!] Error durante el carving: {e}")
+            print(_("[!] Error durante el carving: {error}").format(error=e))
 
 
 
