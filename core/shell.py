@@ -39,6 +39,9 @@ class NTFSShell(cmd.Cmd):
     
     def do_partitions(self, arg):
         """Lista las particiones encontradas en el disco."""
+        if arg.strip() in ('?', '-h', '--help'):
+            print(self.do_partitions.__doc__)
+            return
         if not self.mbr_parser.partitions:
             print(_("No se encontraron particiones."))
             return
@@ -214,6 +217,9 @@ class NTFSShell(cmd.Cmd):
 
     def do_select(self, arg):
         """Selecciona una partición para interactuar con ella. Uso: select <indice>"""
+        if arg.strip() in ('?', '-h', '--help'):
+            print(self.do_select.__doc__)
+            return
         try:
             idx = int(arg)
             if idx < 0 or idx >= len(self.mbr_parser.partitions):
@@ -479,6 +485,9 @@ class NTFSShell(cmd.Cmd):
             
     def do_ls(self, arg):
         """Lista archivos en el directorio actual."""
+        if arg.strip() in ('?', '-h', '--help'):
+            print(self.do_ls.__doc__)
+            return
         if self.selected_partition is None or self.current_parser is None:
             print(_("Selecciona una partición primero."))
             return
@@ -546,6 +555,9 @@ class NTFSShell(cmd.Cmd):
 
     def do_cd(self, arg):
         """Navega a un subdirectorio. Uso: cd <nombre> o cd .."""
+        if arg.strip() in ('?', '-h', '--help'):
+            print(self.do_cd.__doc__)
+            return
         if not self.current_parser:
             print(_("Selecciona una partición primero."))
             return
@@ -822,6 +834,9 @@ class NTFSShell(cmd.Cmd):
 
     def do_cat(self, arg):
         """Muestra el contenido de un archivo, sector o clúster. Uso: cat <id|nombre> o cat sector <num> o cat cluster <num>"""
+        if arg.strip() in ('?', '-h', '--help'):
+            print(self.do_cat.__doc__)
+            return
         args = arg.split()
         if not args:
             print(_("Uso: cat <id|nombre> o cat sector <num> o cat cluster <num>"))
@@ -963,6 +978,9 @@ class NTFSShell(cmd.Cmd):
             
     def do_extract(self, arg):
         """Extrae el contenido de un archivo a disco. Uso: extract <id> <ruta_destino>"""
+        if arg.strip() in ('?', '-h', '--help'):
+            print(self.do_extract.__doc__)
+            return
         args = arg.split()
         if len(args) < 2:
             print("Uso: extract <id> <ruta_destino>")
@@ -1114,6 +1132,9 @@ class NTFSShell(cmd.Cmd):
 
     def do_deleted(self, arg):
         """Lista archivos borrados en la partición activa. Uso: deleted [limite_mft]"""
+        if arg.strip() in ('?', '-h', '--help'):
+            print(self.do_deleted.__doc__)
+            return
         if self.selected_partition is None or self.current_parser is None:
             print(_("Selecciona una partición primero."))
             return
@@ -1182,6 +1203,9 @@ class NTFSShell(cmd.Cmd):
 
     def do_recover(self, arg):
         """Recupera un archivo borrado reconstruyéndolo a partir de metadatos (FAT/NTFS). Uso: recover <id> <ruta_destino>"""
+        if arg.strip() in ('?', '-h', '--help'):
+            print(self.do_recover.__doc__)
+            return
         args = arg.split()
         if len(args) < 2:
             print(_("Uso: recover <id> <ruta_destino>"))
@@ -1469,16 +1493,19 @@ class NTFSShell(cmd.Cmd):
         """Realiza File Carving automatizado buscando Magic Bytes en la partición o en todo el disco.
 
         Uso:
-          carve                          → guarda en el directorio actual, todos los tipos
-          carve <directorio_destino>     → guarda en el directorio indicado, todos los tipos
-          carve [dir] jpg pdf png        → filtra tipos específicos
-          carve --disk [dir] [tipos...]  → fuerza el escaneo de todo el disco/imagen forense completa
-          carve --max-size 50MB          → sobrescribe el tamaño máximo de carving
-          carve --types jpg,png          → filtra tipos específicos de forma explícita
+          carve                          -> guarda en el directorio actual, todos los tipos
+          carve <directorio_destino>     -> guarda en el directorio indicado, todos los tipos
+          carve [dir] jpg pdf png        -> filtra tipos específicos
+          carve --disk [dir] [tipos...]  -> fuerza el escaneo de todo el disco/imagen forense completa
+          carve --max-size 50MB          -> sobrescribe el tamaño máximo de carving
+          carve --types jpg,png          -> filtra tipos específicos de forma explícita
 
         Tipos soportados: definidos en signatures.conf (por defecto: jpg, png, pdf, zip, exe, gif, rar, mp3, db, elf...)
         Si no se especifica directorio, se usa el directorio de trabajo actual.
         """
+        if arg.strip() in ('?', '-h', '--help'):
+            print(self.do_carve.__doc__)
+            return
         import os
         
         args = arg.split()
@@ -1669,6 +1696,37 @@ class NTFSShell(cmd.Cmd):
         return True
 
     # --- Autocompletado ---
+    def _complete_local_path(self, text):
+        """Autocompleta rutas locales en el sistema operativo host."""
+        import os
+        if not text:
+            try:
+                entries = os.listdir('.')
+                return [e + '/' if os.path.isdir(e) else e for e in entries]
+            except Exception:
+                return []
+        
+        dirname, basename = os.path.split(text)
+        search_dir = dirname if dirname else '.'
+        
+        if not os.path.isdir(search_dir):
+            return []
+            
+        try:
+            entries = os.listdir(search_dir)
+            results = []
+            for entry in entries:
+                if entry.lower().startswith(basename.lower()):
+                    full_path = os.path.join(dirname, entry) if dirname else entry
+                    # Normalizar barras a / para simplificar en consola
+                    full_path = full_path.replace('\\', '/')
+                    if os.path.isdir(os.path.join(search_dir, entry)):
+                        full_path += '/'
+                    results.append(full_path)
+            return results
+        except Exception:
+            return []
+
     def _get_current_filenames(self):
         names = []
         if isinstance(self.current_parser, NTFSParser):
@@ -1691,9 +1749,28 @@ class NTFSShell(cmd.Cmd):
         return self._complete_file(text, line, begidx, endidx)
 
     def complete_cat(self, text, line, begidx, endidx):
+        # Si tiene ? o es ayuda
+        if text == '?':
+            return ['?']
         return self._complete_file(text, line, begidx, endidx)
 
     def complete_extract(self, text, line, begidx, endidx):
+        if text == '?':
+            return ['?']
+        # extract <id> <ruta_destino_local>
+        tokens = line.split()
+        # Si ya se especificó el primer argumento, autocompletar la ruta local en el host
+        if len(tokens) > 2 or (len(tokens) == 2 and not text):
+            return self._complete_local_path(text)
+        return self._complete_file(text, line, begidx, endidx)
+
+    def complete_recover(self, text, line, begidx, endidx):
+        if text == '?':
+            return ['?']
+        # recover <id> <ruta_destino_local>
+        tokens = line.split()
+        if len(tokens) > 2 or (len(tokens) == 2 and not text):
+            return self._complete_local_path(text)
         return self._complete_file(text, line, begidx, endidx)
 
     def complete_info(self, text, line, begidx, endidx):
@@ -1702,6 +1779,30 @@ class NTFSShell(cmd.Cmd):
     def complete_runs(self, text, line, begidx, endidx):
         return self._complete_file(text, line, begidx, endidx)
 
+    def complete_select(self, text, line, begidx, endidx):
+        if text == '?':
+            return ['?']
+        if not self.mbr_parser:
+            return []
+        parts = [str(i) for i in range(len(self.mbr_parser.partitions))]
+        return [p for p in parts if p.startswith(text)]
+
+    def complete_carve(self, text, line, begidx, endidx):
+        options = ['--disk', '--types', '--max-size', '?']
+        tokens = line.split()
+
+        # Si el token anterior es --types, autocompletar con tipos de firmas en signatures.conf
+        if len(tokens) > 1 and tokens[-2] == '--types':
+            loaded_sigs = load_signatures()
+            known = sorted(list(set(s["ext"] for s in loaded_sigs)))
+            return [t for t in known if t.startswith(text)]
+
+        # Si empieza con - o es ?, autocompletar opciones
+        if text.startswith('-') or text == '?':
+            return [o for o in options if o.startswith(text)]
+
+        # En otro caso, autocompletar rutas locales en el host
+        return self._complete_local_path(text)
 
     # Atajos
     do_q = do_quit

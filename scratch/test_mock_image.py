@@ -356,10 +356,36 @@ def verify_all_filesystems():
     # Limpieza del Test 9
     shutil.rmtree(config_carve_out)
 
+    # ------------------ 10. TEST DE AYUDA INTERACTIVA Y AUTOCOMPLETADO ------------------
+    print("\n[+] 10. Validando Ayuda Interactiva (?) y Autocompletado de Rutas/Opciones...")
+    
+    # 10.1 Probar "carve ?"
+    sys.stdout = io.StringIO()
+    try:
+        shell.do_carve("?")
+        help_output = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    print("       Salida de 'carve ?':")
+    print("\n".join("         " + line for line in help_output.strip().split("\n")[:4]))
+    assert "Realiza File Carving" in help_output
+    
+    # 10.2 Probar autocompletado de opciones en complete_carve
+    carve_suggestions = shell.complete_carve("--d", "carve --d", 6, 9)
+    print(f"       Sugerencias para 'carve --d': {carve_suggestions}")
+    assert "--disk" in carve_suggestions
+    
+    # 10.3 Probar autocompletado de rutas locales del host en complete_recover (segundo parámetro)
+    recover_suggestions = shell.complete_recover("scra", "recover 0 scra", 10, 14)
+    print(f"       Sugerencias para 'recover 0 scra': {recover_suggestions}")
+    assert any("scratch" in s for s in recover_suggestions)
+    
+    print("    [OK] Ayuda interactiva y autocompletado inteligente validados.")
+
     # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY Y CONFIGURACIONES SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES Y AYUDA INTERACTIVA SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()
