@@ -227,6 +227,10 @@ def format_fat32_partition() -> bytes:
     c4_offset = 334 * 512
     part[c4_offset : c4_offset + 24] = b'DELETED FAT32 MOCK DATA!'
     
+    # Cluster 5 = LBA 335 (Sembramos firma JPEG para testing de Carving)
+    c5_offset = 335 * 512
+    part[c5_offset : c5_offset + 10] = b'\xFF\xD8\xFF_JPEG_\xFF\xD9'
+    
     return bytes(part)
 
 

@@ -1,5 +1,6 @@
 import sys
 import os
+import shutil
 
 sys.path.insert(0, '.')
 
@@ -9,6 +10,7 @@ from fs.fat_parser import FATParser
 from fs.exfat_parser import exFATParser
 from fs.ntfs_parser import NTFSParser
 from fs.ext4_parser import Ext4Parser
+from core.shell import NTFSShell
 
 def verify_all_filesystems():
     image_path = "test_disk.raw"
@@ -210,7 +212,56 @@ def verify_all_filesystems():
     assert contentext4 == b"HELLO EXT4 DATA "
     
     source.close()
-    print("\n[OK] ¡TODAS LAS PARTICIONES Y ARCHIVOS SE VALIDARON CORRECTAMENTE A BAJO NIVEL EN LA IMAGEN!")
+    
+    # ------------------ 7. TEST CARVING (DISCO Y PARTICIÓN) ------------------
+    print("\n[+] 7. Validando Módulo de File Carving (Disco y Partición)...")
+    
+    source = RawImageSource("test_disk.raw")
+    shell = NTFSShell(source, pm)
+    
+    test_out_dir = "scratch/carve_test_out"
+    if os.path.exists(test_out_dir):
+        shutil.rmtree(test_out_dir)
+    os.makedirs(test_out_dir, exist_ok=True)
+        
+    # Test A: Carving de todo el disco (sin seleccionar partición)
+    # Buscamos solo tipo 'jpg' para ir rápido
+    print("    -> Ejecutando carve en toda la imagen de disco...")
+    shell.do_carve(f"{test_out_dir} jpg")
+    
+    # Verificar que el archivo JPEG fue recuperado
+    files = os.listdir(test_out_dir)
+    print(f"       Archivos recuperados de todo el disco: {files}")
+    assert len(files) >= 1
+    jpg_files = [f for f in files if f.endswith(".jpg")]
+    assert len(jpg_files) >= 1
+    
+    # Leer el contenido del archivo carved y verificar que tiene nuestra firma y texto
+    with open(os.path.join(test_out_dir, jpg_files[0]), 'rb') as f:
+        carved_data = f.read()
+    assert b'_JPEG_' in carved_data
+    print("    [OK] Carving de disco completo validado.")
+    
+    # Test B: Carving de una partición (seleccionamos la partición FAT32)
+    # Reiniciar directorio
+    shutil.rmtree(test_out_dir)
+    os.makedirs(test_out_dir, exist_ok=True)
+    
+    shell.do_select("2") # Seleccionar Partición 2 (FAT32)
+    print("    -> Ejecutando carve en la partición FAT32...")
+    shell.do_carve(f"{test_out_dir} jpg")
+    
+    files_part = os.listdir(test_out_dir)
+    print(f"       Archivos recuperados de la partición FAT32: {files_part}")
+    assert len(files_part) >= 1
+    jpg_files_part = [f for f in files_part if f.endswith(".jpg")]
+    assert len(jpg_files_part) >= 1
+    
+    # Limpieza
+    shutil.rmtree(test_out_dir)
+    source.close()
+    
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS Y CARVING SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()

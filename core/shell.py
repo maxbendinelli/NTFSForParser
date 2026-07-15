@@ -1398,24 +1398,46 @@ class NTFSShell(cmd.Cmd):
 
 
     def do_carve(self, arg):
-        """Realiza File Carving automatizado buscando Magic Bytes en la partición.
+        """Realiza File Carving automatizado buscando Magic Bytes en la partición o en todo el disco.
 
         Uso:
           carve                          → guarda en el directorio actual, todos los tipos
           carve <directorio_destino>     → guarda en el directorio indicado, todos los tipos
           carve [dir] jpg pdf png        → filtra tipos específicos
+          carve --disk [dir] [tipos...]  → fuerza el escaneo de todo el disco/imagen forense completa
 
         Tipos soportados: jpg, png, pdf, zip, exe, gif, rar, mp3, db, elf
         Si no se especifica directorio, se usa el directorio de trabajo actual.
         """
         import os
+        
+        args = arg.split()
+        use_entire_disk = False
+        
+        if "--disk" in args:
+            use_entire_disk = True
+            args.remove("--disk")
+            
         if not self.current_parser:
-            print(_("Selecciona una partición válida primero."))
-            return
+            use_entire_disk = True
+            
+        # Determinar partición destino
+        if use_entire_disk:
+            class DiskPartitionMock:
+                def __init__(self, size_in_bytes):
+                    self.start_offset = 0
+                    self.size_in_bytes = size_in_bytes
+            
+            try:
+                disk_size = self.data_source.get_size()
+            except Exception as e:
+                print(_("[!] Error al determinar el tamaño de la imagen de disco: {error}").format(error=e))
+                return
+            target_partition = DiskPartitionMock(disk_size)
+        else:
+            target_partition = self.current_parser.partition
 
         KNOWN_TYPES = {s["ext"].lower() for s in SIGNATURES}
-
-        args = arg.split()
 
         # Detectar si el primer argumento es un tipo conocido o un directorio
         if not args:
@@ -1442,10 +1464,17 @@ class NTFSShell(cmd.Cmd):
 
         # Resumen previo
         sigs_to_use = custom_sigs if custom_sigs else SIGNATURES
-        print(_("\n[+] Iniciando File Carving automatizado en la partición {part}...").format(part=self.selected_partition))
-        print(_("    Directorio de salida : {out_dir}").format(out_dir=output_dir))
-        print(_("    Tipos a buscar       : {types}").format(types=', '.join(s['name'] for s in sigs_to_use)))
-        print(_("    Tamaño de partición  : {size:.2f} MB").format(size=self.current_parser.partition.size_in_bytes / (1024**2)))
+        if use_entire_disk:
+            print(_("\n[+] Iniciando File Carving automatizado en toda la imagen de disco..."))
+            print(_("    Directorio de salida : {out_dir}").format(out_dir=output_dir))
+            print(_("    Tipos a buscar       : {types}").format(types=', '.join(s['name'] for s in sigs_to_use)))
+            print(_("    Tamaño del disco     : {size:.2f} MB").format(size=target_partition.size_in_bytes / (1024**2)))
+        else:
+            print(_("\n[+] Iniciando File Carving automatizado en la partición {part}...").format(part=self.selected_partition))
+            print(_("    Directorio de salida : {out_dir}").format(out_dir=output_dir))
+            print(_("    Tipos a buscar       : {types}").format(types=', '.join(s['name'] for s in sigs_to_use)))
+            print(_("    Tamaño de partición  : {size:.2f} MB").format(size=target_partition.size_in_bytes / (1024**2)))
+            
         print(_("    Esto puede tardar varios minutos en particiones grandes."))
         print("-" * 80)
 
@@ -1464,12 +1493,13 @@ class NTFSShell(cmd.Cmd):
         try:
             carver = FileCarver(
                 data_source=self.data_source,
-                partition=self.current_parser.partition,
+                partition=target_partition,
                 output_dir=output_dir,
                 progress_cb=progress,
                 custom_signatures=custom_sigs,
             )
             results = carver.carve()
+
 
             sys.stdout.write("\n")
             print(_("\n[+] Carving finalizado."))
@@ -1477,7 +1507,8 @@ class NTFSShell(cmd.Cmd):
             print(_("    Saltados / errores   : {count}").format(count=carver.skipped_count))
 
             if results:
-                print(_("\n    {'#':<6} | {'Tipo':<22} | {'Offset':<14} | {'Tamaño':<12} | {'Footer':<8} | Nombre").format())
+                print(_("\n    {'#':<6} | {'Tipo':<22} | {'Offset':<14} | {'Tamaño':<12} | {'Footer':<8} | Nombre"))
+
                 print("    " + "-" * 90)
                 for r in results:
                     footer_ok = "[OK]" if r["footer_found"] else "[TRUNC]"
