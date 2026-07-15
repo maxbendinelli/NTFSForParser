@@ -39,3 +39,8 @@ ENV/
 
 # Distribución / Empaquetado
 *.spec
+
+# Pruebas y Desarrollo Interno
+create_dummy_image.py
+create_e01_test.py
+scratch/
