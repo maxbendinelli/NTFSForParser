@@ -1112,6 +1112,74 @@ class NTFSShell(cmd.Cmd):
         """Alias para dump_clusters. Uso: dump_blocks <inicio> <fin | +cantidad> <ruta_destino>"""
         self.do_dump_clusters(arg)
 
+    def do_deleted(self, arg):
+        """Lista archivos borrados en la partición activa. Uso: deleted [limite_mft]"""
+        if self.selected_partition is None or self.current_parser is None:
+            print(_("Selecciona una partición primero."))
+            return
+
+        if isinstance(self.current_parser, NTFSParser):
+            limit = 1000
+            if arg.strip():
+                try:
+                    limit = int(arg.strip())
+                except ValueError:
+                    pass
+
+            print(_("\n[+] Escaneando los primeros {limit} registros MFT en busca de archivos borrados...").format(limit=limit))
+            print(_("{id:<8} | {type:<6} | {status:<10} | {mod:<20} | {name}").format(id="ID", type="Tipo", status="Estado", mod="Modificación", name="Nombre del Archivo"))
+            print("-" * 80)
+
+            deleted_found = 0
+            for i in range(limit):
+                try:
+                    record = self.current_parser.get_mft_record(i)
+                    if record.signature != 'FILE':
+                        continue
+
+                    record.parse_attributes()
+                    if not record.is_in_use() and record.file_name:
+                        tipo = "DIR" if record.is_directory() else "FILE"
+                        estado = _("Borrado")
+                        mod_date = record.modified if record.modified else "N/A"
+                        print(f"{i:<8} | {tipo:<6} | {estado:<10} | {mod_date:<20} | {record.file_name}")
+                        deleted_found += 1
+                except Exception:
+                    pass
+            print(_("\n[+] Fin del escaneo. Borrados encontrados: {count}").format(count=deleted_found))
+
+        elif isinstance(self.current_parser, (FATParser, exFATParser)):
+            print(_("\n[+] Buscando entradas borradas en el directorio actual '{path}'...").format(path=self.current_path))
+            try:
+                if isinstance(self.current_parser, exFATParser):
+                    no_fat_chain = getattr(self, 'current_directory_no_fat_chain', False)
+                    size = getattr(self, 'current_directory_size', 0)
+                    all_entries = self.current_parser.get_directory_entries(self.current_directory_id, no_fat_chain, size)
+                else:
+                    all_entries = self.current_parser.get_directory_entries(self.current_directory_id)
+
+                # Filtrar solo las entradas borradas
+                self.fat_files_cache = [entry for entry in all_entries if entry.is_deleted]
+
+                print(_("{id:<8} | {type:<6} | {status:<10} | {size:<10} | {mod:<20} | {name}").format(id="ID", type="Tipo", status="Estado", size="Tamaño", mod="Modificación", name="Nombre"))
+                print("-" * 90)
+
+                for idx, entry in enumerate(self.fat_files_cache):
+                    tipo = "DIR" if entry.is_directory else "FILE"
+                    estado = _("Borrado")
+                    mod_date = entry.modified if entry.modified else "N/A"
+                    print(f"{idx:<8} | {tipo:<6} | {estado:<10} | {entry.size:<10} | {mod_date:<20} | {entry.name}")
+
+                print(_("\n[+] Fin del escaneo. Borrados encontrados: {count}").format(count=len(self.fat_files_cache)))
+            except Exception as e:
+                print(_("Error al leer FAT: {error}").format(error=e))
+
+        elif isinstance(self.current_parser, Ext4Parser):
+            print(_("\n[!] En Ext4, cuando se borra un archivo, el inodo se marca como libre, los bloques de datos se liberan en el bitmap,"))
+            print(_("    y la entrada del directorio se compacta desvinculando el nombre del archivo inmediatamente."))
+            print(_("    Por lo tanto, la recuperación basada en metadatos del directorio no es factible mediante este listado."))
+            print(_("    Se recomienda utilizar el comando 'carve' en su lugar, o analizar el Journal del sistema de archivos (jbd2) si está disponible."))
+
     def do_recover(self, arg):
         """Recupera un archivo borrado reconstruyéndolo a partir de metadatos (FAT/NTFS). Uso: recover <id> <ruta_destino>"""
         args = arg.split()

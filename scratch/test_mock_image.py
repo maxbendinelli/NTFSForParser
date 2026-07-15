@@ -257,11 +257,79 @@ def verify_all_filesystems():
     jpg_files_part = [f for f in files_part if f.endswith(".jpg")]
     assert len(jpg_files_part) >= 1
     
-    # Limpieza
-    shutil.rmtree(test_out_dir)
+    # ------------------ 8. TEST DE COMANDO DELETED Y RECOVERY ------------------
+    print("\n[+] 8. Validando Comando 'deleted' y Recuperación Basada en Metadatos...")
+    
+    # FAT32 (Partición 2, índice 2 de pm.partitions)
+    shell.do_select("2")
+    shell.fat_files_cache = []
+    shell.do_deleted("")
+    
+    # Verificar que _ELETED.TXT está en la caché de FAT y listado
+    print(f"       Caché FAT cargada por 'deleted': {[e.name for e in shell.fat_files_cache]}")
+    deleted_entry = next((e for e in shell.fat_files_cache if e.name == "_ELETED.TXT"), None)
+    assert deleted_entry is not None
+    assert deleted_entry.is_deleted is True
+    
+    # Probar recuperación usando recover <id>
+    idx_deleted = shell.fat_files_cache.index(deleted_entry)
+    rec_dest = "scratch/rec_fat32_deleted.txt"
+    if os.path.exists(rec_dest):
+        os.remove(rec_dest)
+    shell.do_recover(f"{idx_deleted} {rec_dest}")
+    assert os.path.exists(rec_dest)
+    with open(rec_dest, 'rb') as f:
+        rec_data = f.read()
+    print(f"       Archivo FAT32 recuperado: {rec_data}")
+    assert len(rec_data) == 24
+    os.remove(rec_dest)
+    
+    # NTFS (Partición 4, índice 4 de pm.partitions)
+    shell.do_select("4")
+    # Capturar la salida estándar para verificar si deleted.txt aparece
+    import io
+    old_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+    try:
+        shell.do_deleted("40")
+        output = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+        
+    print("       Salida de 'deleted' en NTFS:")
+    print("\n".join("         " + line for line in output.strip().split("\n")))
+    assert "deleted.txt" in output.lower()
+    
+    # Extraer el ID MFT del archivo deleted.txt de la salida del comando o buscarlo manualmente
+    ntfs_deleted_id = None
+    for i in range(40):
+        try:
+            rec = shell.current_parser.get_mft_record(i)
+            if rec.signature == 'FILE':
+                rec.parse_attributes()
+                if rec.file_name == "deleted.txt" and not rec.is_in_use():
+                    ntfs_deleted_id = i
+                    break
+        except Exception:
+            pass
+            
+    assert ntfs_deleted_id is not None
+    rec_ntfs_dest = "scratch/rec_ntfs_deleted.txt"
+    if os.path.exists(rec_ntfs_dest):
+        os.remove(rec_ntfs_dest)
+        
+    shell.do_recover(f"{ntfs_deleted_id} {rec_ntfs_dest}")
+    assert os.path.exists(rec_ntfs_dest)
+    with open(rec_ntfs_dest, 'rb') as f:
+        rec_ntfs_data = f.read()
+    print(f"       Archivo NTFS recuperado: {rec_ntfs_data}")
+    assert len(rec_ntfs_data) > 0
+    os.remove(rec_ntfs_dest)
+
+    # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS Y CARVING SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING Y RECOVERY SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()

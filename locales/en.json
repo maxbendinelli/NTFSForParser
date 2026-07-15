@@ -172,5 +172,12 @@
     "    Sistema de archivos detectado: {name}": "    Detected file system: {name}",
     "[+] Recuperando archivo borrado en exFAT de '{name}' (Archivo CONTIGUO - Reconstrucción 100% integra)...": "[+] Recovering deleted exFAT file '{name}' (CONTIGUOUS file - 100% intact recovery)...",
     "[+] Intentando recuperación contigua en exFAT de '{name}' (Archivo fragmentado - la cadena FAT fue borrada)...": "[+] Attempting contiguous exFAT recovery of '{name}' (Fragmented file - FAT chain was cleared)...",
-    "[+] Intentando recuperación contigua en FAT de '{name}' (Inicio: {cluster}, Tamaño: {size} bytes)...": "[+] Attempting contiguous FAT recovery of '{name}' (Start: {cluster}, Size: {size} bytes)..."
+    "[+] Intentando recuperación contigua en FAT de '{name}' (Inicio: {cluster}, Tamaño: {size} bytes)...": "[+] Attempting contiguous FAT recovery of '{name}' (Start: {cluster}, Size: {size} bytes)...",
+    "\n[+] Escaneando los primeros {limit} registros MFT en busca de archivos borrados...": "\n[+] Scanning the first {limit} MFT records looking for deleted files...",
+    "\n[+] Fin del escaneo. Borrados encontrados: {count}": "\n[+] Scan finished. Deleted files found: {count}",
+    "\n[+] Buscando entradas borradas en el directorio actual '{path}'...": "\n[+] Searching for deleted entries in current directory '{path}'...",
+    "\n[!] En Ext4, cuando se borra un archivo, el inodo se marca como libre, los bloques de datos se liberan en el bitmap,": "\n[!] In Ext4, when a file is deleted, the inode is marked as free, data blocks are freed in the bitmap,",
+    "    y la entrada del directorio se compacta desvinculando el nombre del archivo inmediatamente.": "    and the directory entry is compacted, unlinking the filename immediately.",
+    "    Por lo tanto, la recuperación basada en metadatos del directorio no es factible mediante este listado.": "    Therefore, directory metadata-based recovery is not feasible using this listing.",
+    "    Se recomienda utilizar el comando 'carve' en su lugar, o analizar el Journal del sistema de archivos (jbd2) si está disponible.": "    It is recommended to use the 'carve' command instead, or analyze the filesystem Journal (jbd2) if available."
 }
