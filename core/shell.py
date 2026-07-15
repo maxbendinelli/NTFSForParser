@@ -1686,6 +1686,44 @@ class NTFSShell(cmd.Cmd):
         print(f"    Última Montura   : {sb.format_time(sb.mtime)}")
         print(f"    Última Escritura : {sb.format_time(sb.wtime)}")
 
+    def do_help(self, arg):
+        """Muestra la ayuda de los comandos disponibles."""
+        if arg.strip():
+            super().do_help(arg)
+            return
+
+        print(_("\n=================================================================================="))
+        print(_("  COMANDOS DISPONIBLES EN EL SHELL FORENSE"))
+        print(_("=================================================================================="))
+        
+        print(_("\n[+] COMANDOS GENERALES Y DE NAVEGACIÓN:"))
+        print(f"  partitions       - {_('Lista las particiones físicas detectadas en el disco')}")
+        print(f"  select <idx>     - {_('Selecciona y monta una partición por su índice en la tabla')}")
+        print(f"  imageinfo        - {_('Muestra los metadatos de la imagen (sólo E01)')}")
+        print(f"  hash_check [alg] - {_('Verifica la integridad de la imagen calculando MD5, SHA1 o SHA256')}")
+        print(f"  ls               - {_('Lista los archivos y directorios del directorio actual')}")
+        print(f"  cd <directorio>  - {_('Navega a un subdirectorio (ej. cd .. o cd carpetaborrada)')}")
+        print(f"  cat <id|nombre>  - {_('Muestra el contenido en texto (o hexdump) de un archivo o sector')}")
+        
+        print(_("\n[+] COMANDOS DE ANÁLISIS FORENSE Y RECUPERACIÓN:"))
+        print(f"  deleted [limit]  - {_('Lista los archivos que fueron borrados en la partición activa')}")
+        print(f"  recover <id> <d> - {_('Recupera un archivo borrado basándose en sus metadatos (MFT/FAT)')}")
+        print(f"  carve [opciones] - {_('File carving ciego. Opciones: --disk, --max-size, --types, ?')}")
+        print(f"  find_orphans     - {_('NTFS: Busca archivos cuyo directorio padre fue borrado o no es válido')}")
+        print(f"  runs <id|nombre> - {_('Muestra la cadena de asignación lógica (Data Runs/FAT/Extents) de un archivo')}")
+        print(f"  identify <s|c>   - {_('Aplica Magic Bytes sobre un sector o clúster físico para identificarlo')}")
+        
+        print(_("\n[+] COMANDOS DE BAJO NIVEL Y SISTEMA:"))
+        print(f"  hexdump <o> <l>  - {_('Muestra un volcado hexadecimal absoluto de la imagen')}")
+        print(f"  sector <num>     - {_('Vuelca los datos del LBA físico especificado')}")
+        print(f"  cluster <num>    - {_('Vuelca los datos del clúster lógico seleccionado')}")
+        print(f"  dump_clusters    - {_('Vuelca un rango de clústeres a un archivo del host')}")
+        print(f"  superblock       - {_('Ext4: Muestra la información técnica detallada del superbloque')}")
+        print(f"  exit / quit      - {_('Termina la sesión y sale del shell interactivo')}")
+        
+        print(_("\n💡 Tip forense: Podés escribir '<comando> ?' o 'help <comando>' para ver los parámetros detallados."))
+        print("==================================================================================\n")
+
     def do_exit(self, arg):
         """Sale del shell interactivo."""
         print("Saliendo...")

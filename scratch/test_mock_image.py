@@ -382,10 +382,24 @@ def verify_all_filesystems():
     
     print("    [OK] Ayuda interactiva y autocompletado inteligente validados.")
 
+    # ------------------ 11. TEST DE MENÚ DE AYUDA GENERAL PERSONALIZADO ------------------
+    print("\n[+] 11. Validando Menú de Ayuda General Personalizado (help / ?)...")
+    sys.stdout = io.StringIO()
+    try:
+        shell.do_help("")
+        gen_help_output = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    print("       Salida de 'help':")
+    print("\n".join("         " + line for line in gen_help_output.strip().split("\n")[:6]))
+    assert "COMANDOS DISPONIBLES EN EL SHELL FORENSE" in gen_help_output
+    assert "COMANDOS GENERALES Y DE NAVEGACIÓN:" in gen_help_output
+    print("    [OK] Menú de ayuda general personalizado validado.")
+
     # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES Y AYUDA INTERACTIVA SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO Y AYUDA GENERAL SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()
