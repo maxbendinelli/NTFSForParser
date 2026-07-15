@@ -84,7 +84,7 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 ### Lectura y Recuperación de Evidencia
 - `cat <nombre | id | sector X | cluster Y>`: Imprime por consola el texto o vuelca el hexdump de un archivo o bloque de disco. Soporta sintaxis `cat id:stream_name` para extraer ADS. Ensambla archivos No-Residentes.
 - `extract <id> <ruta_destino>`: Copia de forma forense el archivo (residente o no-residente) desde la imagen de disco hacia tu PC.
-- `recover <id> <ruta_destino>`: Recupera un archivo borrado utilizando metadatos estructurados. **Para NTFS**: reconstruye el archivo completo respetando su fragmentación original a partir de los Data Runs/atributos del registro MFT (incluso si está inactivo/borrado). **Para FAT32**: realiza una extracción contigua a partir del clúster de inicio y el tamaño original del archivo.
+- `recover <id> <ruta_destino>`: Recupera un archivo borrado utilizando metadatos estructurados. **Para NTFS**: reconstruye el archivo completo respetando su fragmentación original a partir de los Data Runs/atributos del registro MFT (incluso si está inactivo/borrado). **Para exFAT**: utiliza la bandera `NoFatChain` de la entrada de metadatos (si es contiguo) para recuperarlo de forma íntegra, o recorre la cadena FAT de 32 bits. **Para FAT12/16/32**: realiza una extracción contigua a partir del clúster de inicio y el tamaño original del archivo.
 - `dump_clusters <inicio> <fin | +cantidad> <destino>` (o `dump_blocks`): Extrae un rango directo de clústeres o bloques crudos del disco. Ej: `dump_clusters 100 +50 out.bin`.
 - `search [-r] <patron>`: Busca un texto o expresión regular (-r) a lo largo de toda la partición. Soporta automáticamente codificación ASCII/UTF-8 y UTF-16LE (común en MFT). Extrae el contexto y su offset físico.
 - `carve [directorio_destino] [tipos...]`: Realiza **File Carving automatizado** sobre la partición cruda buscando firmas de Magic Bytes. El directorio es opcional (por defecto: directorio actual). Se puede filtrar por tipo: `carve jpg pdf` o `carve ./out mkv mp4`.
@@ -107,6 +107,24 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 
 ---
 
+## 🧪 Pruebas y Desarrollo
+
+El framework incluye herramientas nativas para simular imágenes de disco GPT con todas las particiones soportadas pobladas con archivos de prueba activos y eliminados:
+
+1. **Generar la imagen de prueba (`test_disk.raw`)**:
+   ```bash
+   python scratch/generate_test_image.py
+   ```
+   *(Este comando genera un archivo mock de 50 MB con Protective MBR, GPT y 6 particiones válidas de FAT12, FAT16, FAT32, exFAT, NTFS y Ext4 de forma portable y sin privilegios de administración).*
+
+2. **Ejecutar la suite de validación automatizada**:
+   ```bash
+   python scratch/test_mock_image.py
+   ```
+   *(Este test verifica el montaje, lectura de directorios, decodificación de metadatos y recuperación a bajo nivel para todas las particiones del disco de prueba).*
+
+---
+
 ## 🗺️ Roadmap (Próximas Funcionalidades)
 
 - ✅ ~~**Verificación Completa E01**~~: Implementado — `hash_check` lee los hashes almacenados en el contenedor E01 (MD5/SHA1), verifica los CRC internos por chunk y compara contra el hash calculado en tiempo real. Soporta también SHA256 como argumento opcional.
@@ -115,6 +133,5 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 - ✅ **Entorno de Pruebas Integrado**: Implementado — un generador binario de disco virtual GPT (`scratch/generate_test_image.py`) que crea y puebla 6 particiones válidas a bajo nivel con archivos activos y borrados, junto a una suite de validación automatizada (`scratch/test_mock_image.py`).
 - ✅ **Expansión de Idiomas (i18n)**: Implementado — soporte completo del 100% de los comandos interactivos, errores, metadatos y parsers de particiones en Español e Inglés. Se puede inicializar con el parámetro `--lang en`.
 
----
 
 > *Desarrollado para entornos académicos y enseñanza de análisis binario y file systems.*
