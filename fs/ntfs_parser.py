@@ -84,7 +84,7 @@ class NTFSParser:
     def get_cluster_size(self) -> int:
         return self.vbr.bytes_per_cluster
 
-    def get_mft_record(self, index: int) -> MFTRecord:
+    def get_mft_record(self, index: int) -> 'MFTRecord':
         """Lee un registro de la MFT por su índice asumiendo contigüidad inicial."""
         mft_start_offset = self.vbr.get_mft_offset()
         record_size = self.vbr.bytes_per_mft_record
