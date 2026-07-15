@@ -20,8 +20,10 @@ Actualmente soporta análisis profundo sobre particiones **FAT12**, **FAT16**, *
 3. **Navegación Jerárquica:** El comando `cd` te permite entrar a carpetas y el comando `ls` te muestra el contenido en vivo.
 4. **Data Carving y Recuperación:** Usa el comando `recover` para demostrar la reconstrucción forense a partir de metadatos de archivos borrados: NTFS (reconstrucción completa fragmentada vía Data Runs), exFAT (reconstrucción 100% íntegra si es contiguo vía `NoFatChain` o contigua), y FAT12/16/32 (extracción contigua).
 5. **Comprobación de Integridad Forense Avanzada:** Usa `hash_check` para leer la imagen y verificar hashes. Para E01, extrae y compara hashes MD5/SHA1 internos y realiza comprobaciones de integridad CRC por chunk.
-6. **File Carving Automatizado:** Con soporte para más de 50 firmas de archivos estructurados por categorías (imágenes, audios, vídeos, documentos, comprimidos, ejecutables, bases de datos, llaves criptográficas, registros de Windows, etc.) usando la técnica de Magic Bytes.
+6. **File Carving Automatizado:** Con soporte para más de 50 firmas de archivos estructurados por categorías usando la técnica de Magic Bytes (configurable en `signatures.conf`).
 7. **Múltiples Formatos Soportados:** Imágenes RAW completas, Divididas/Split (001, 002) y contenedores EnCase (E01).
+8. **Soporte Completo i18n Bilingüe:** 100% del framework traducido (mensajes, errores, parsers y ayuda contextual) a Español e Inglés (inicializable con `--lang en`).
+9. **Ayuda Contextual y Autocompletado**: Menú de ayuda general (`help` o `?`) categorizado, ayuda en caliente de comandos (`<comando> ?`) y autocompletador inteligente para rutas del host local.
 
 ---
 
@@ -127,12 +129,10 @@ El framework incluye herramientas nativas para simular imágenes de disco GPT co
 
 ## 🗺️ Roadmap (Próximas Funcionalidades)
 
-- ✅ ~~**Verificación Completa E01**~~: Implementado — `hash_check` lee los hashes almacenados en el contenedor E01 (MD5/SHA1), verifica los CRC internos por chunk y compara contra el hash calculado en tiempo real. Soporta también SHA256 como argumento opcional.
-- ✅ ~~**File Carving Automatizado**~~: Implementado — usa `carve <dir> [tipos...]` para recuperar archivos eliminados por Magic Bytes (JPG, PNG, PDF, ZIP, EXE, GIF, RAR, MP3, SQLite, ELF).
-- ✅ **Soporte FAT12, FAT16 y exFAT**: Implementado — decodificación de clústeres FAT12 de 12 bits, FAT16 de 16 bits, y exFAT VBR parameter shifts, Allocation Bitmap (`NoFatChain`) y agrupaciones de sets de directorios de 32 bytes.
-- ✅ **Entorno de Pruebas Integrado**: Implementado — un generador binario de disco virtual GPT (`scratch/generate_test_image.py`) que crea y puebla 6 particiones válidas a bajo nivel con archivos activos y borrados, junto a una suite de validación automatizada (`scratch/test_mock_image.py`).
-- ✅ **Expansión de Idiomas (i18n)**: Implementado — soporte completo del 100% de los comandos interactivos, errores, metadatos y parsers de particiones en Español e Inglés. Se puede inicializar con el parámetro `--lang en`.
-- ✅ **Ayuda Contextual y Autocompletado**: Implementado — ayuda interactiva categorizada en el comando `help` (o `?`), ayuda específica contextual con `<comando> ?`, autocompletado de opciones y autocompletador inteligente para rutas locales del host.
+- [ ] Soporte para análisis de particiones APFS / HFS+ (Apple).
+- [ ] Visualizador dinámico de mapas de clústeres ocupados/libres en modo texto en el shell.
+- [ ] Mapeo e interpretación automática de estructuras complejas (Journal JBD2 de Ext4 y transacciones de NTFS).
+- [ ] Generación automática de reportes de hallazgos forenses en formato HTML y PDF.
 
 
 > *Desarrollado para entornos académicos y enseñanza de análisis binario y file systems.*
