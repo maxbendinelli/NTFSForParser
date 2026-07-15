@@ -30,6 +30,10 @@ class MBRParser:
     """
     
     PARTITION_TYPES = {
+        0x01: "FAT12",
+        0x04: "FAT16 (<32MB)",
+        0x06: "FAT16",
+        0x0E: "FAT16 (LBA)",
         0x07: "NTFS / exFAT",
         0x0B: "FAT32",
         0x0C: "FAT32 (LBA)",

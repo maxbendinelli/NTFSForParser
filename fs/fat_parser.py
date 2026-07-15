@@ -17,29 +17,57 @@ class FATBootSectorParser:
         self.num_fats = 0
         self.sectors_per_fat = 0
         self.root_cluster = 0
+        self.root_entry_count = 0
+        self.root_dir_sectors = 0
+        self.fat_type = 32 # Por defecto FAT32
         
         self._parse_boot_sector()
 
     def _parse_boot_sector(self):
         # Leer el sector de arranque (VBR)
         self.raw_boot = self.data_source.read(self.partition.start_offset, 512)
-        
+        if len(self.raw_boot) < 512:
+            raise ValueError("No se pudo leer el sector de arranque de 512 bytes.")
+            
         # FAT BPB (BIOS Parameter Block)
         self.bytes_per_sector = struct.unpack('<H', self.raw_boot[11:13])[0]
         self.sectors_per_cluster = struct.unpack('<B', self.raw_boot[13:14])[0]
         self.reserved_sectors = struct.unpack('<H', self.raw_boot[14:16])[0]
         self.num_fats = struct.unpack('<B', self.raw_boot[16:17])[0]
+        self.root_entry_count = struct.unpack('<H', self.raw_boot[17:19])[0]
         
-        # Para FAT32, Sectors per FAT (16 bits) en offset 22 es 0. 
-        # El valor real (32 bits) está en el offset 36
+        # Sectores totales (16 bits u offset de 32 bits)
+        total_sectors_16 = struct.unpack('<H', self.raw_boot[19:21])[0]
+        total_sectors_32 = struct.unpack('<I', self.raw_boot[32:36])[0]
+        total_sectors = total_sectors_16 if total_sectors_16 != 0 else total_sectors_32
+        
         fat_size_16 = struct.unpack('<H', self.raw_boot[22:24])[0]
-        if fat_size_16 == 0:
-            self.sectors_per_fat = struct.unpack('<I', self.raw_boot[36:40])[0]
-            self.root_cluster = struct.unpack('<I', self.raw_boot[44:48])[0]
-        else:
-            # FAT12 / FAT16
+        
+        # Sectores por FAT
+        if fat_size_16 != 0:
             self.sectors_per_fat = fat_size_16
-            self.root_cluster = 2  # Usualmente empieza en la raíz lógica fija
+        else:
+            self.sectors_per_fat = struct.unpack('<I', self.raw_boot[36:40])[0]
+
+        # Sectores del Directorio Raíz fijo (para FAT12/16)
+        self.root_dir_sectors = ((self.root_entry_count * 32) + (self.bytes_per_sector - 1)) // self.bytes_per_sector
+        
+        # Sectores de Datos y Conteo de Clústeres (Fórmula estándar de MS)
+        data_sectors = total_sectors - (self.reserved_sectors + (self.num_fats * self.sectors_per_fat) + self.root_dir_sectors)
+        count_of_clusters = 0
+        if self.sectors_per_cluster > 0:
+            count_of_clusters = data_sectors // self.sectors_per_cluster
+            
+        # Determinar tipo oficial
+        if count_of_clusters < 4085:
+            self.fat_type = 12
+            self.root_cluster = 0  # Usamos 0 como indicador lógico de Root Dir Fijo
+        elif count_of_clusters < 65525:
+            self.fat_type = 16
+            self.root_cluster = 0  # Usamos 0 como indicador lógico de Root Dir Fijo
+        else:
+            self.fat_type = 32
+            self.root_cluster = struct.unpack('<I', self.raw_boot[44:48])[0]
 
     def get_fat_start_offset(self) -> int:
         """Retorna el offset absoluto donde comienza la File Allocation Table."""
@@ -76,9 +104,10 @@ class FATParser:
         return info
 
     def get_data_start_offset(self) -> int:
-        """Calcula el inicio de la región de datos (Asumiendo FAT32 para simplificar)."""
+        """Calcula el inicio de la región de datos."""
         fat_size_bytes = self.boot_sector.num_fats * self.boot_sector.sectors_per_fat * self.boot_sector.bytes_per_sector
-        return self.boot_sector.get_fat_start_offset() + fat_size_bytes
+        root_dir_bytes = self.boot_sector.root_dir_sectors * self.boot_sector.bytes_per_sector
+        return self.boot_sector.get_fat_start_offset() + fat_size_bytes + root_dir_bytes
 
     def get_cluster_offset(self, cluster_num: int) -> int:
         """Calcula el offset absoluto de un clúster en FAT."""
@@ -91,7 +120,7 @@ class FATParser:
 
     def get_fat_chain(self, start_cluster: int) -> list:
         """
-        Recorre la File Allocation Table (FAT32) para obtener todos los clústeres de una cadena.
+        Recorre la File Allocation Table (FAT12/FAT16/FAT32) para obtener todos los clústeres de una cadena.
         """
         chain = []
         current_cluster = start_cluster
@@ -103,21 +132,43 @@ class FATParser:
         while current_cluster >= 2 and len(chain) < max_clusters:
             chain.append(current_cluster)
             
-            # En FAT32, cada entrada ocupa 4 bytes (32 bits)
-            entry_offset = fat_start + (current_cluster * 4)
-            entry_data = self.data_source.read(entry_offset, 4)
-            if not entry_data or len(entry_data) < 4:
-                break
+            if self.boot_sector.fat_type == 32:
+                entry_offset = fat_start + (current_cluster * 4)
+                entry_data = self.data_source.read(entry_offset, 4)
+                if not entry_data or len(entry_data) < 4:
+                    break
+                next_cluster = struct.unpack('<I', entry_data)[0]
+                next_cluster &= 0x0FFFFFFF
+                eof_marker = 0x0FFFFFF8
+                bad_marker = 0x0FFFFFF7
+            elif self.boot_sector.fat_type == 16:
+                entry_offset = fat_start + (current_cluster * 2)
+                entry_data = self.data_source.read(entry_offset, 2)
+                if not entry_data or len(entry_data) < 2:
+                    break
+                next_cluster = struct.unpack('<H', entry_data)[0]
+                eof_marker = 0xFFF8
+                bad_marker = 0xFFF7
+            else: # FAT12
+                # Cada entrada es de 1.5 bytes. 
+                # Calculamos el offset del byte que contiene el inicio de la entrada
+                entry_offset = fat_start + ((current_cluster * 3) // 2)
+                entry_data = self.data_source.read(entry_offset, 2)
+                if not entry_data or len(entry_data) < 2:
+                    break
+                val = struct.unpack('<H', entry_data)[0]
+                if current_cluster % 2 == 0:
+                    next_cluster = val & 0x0FFF
+                else:
+                    next_cluster = val >> 4
+                eof_marker = 0xFF8
+                bad_marker = 0xFF7
                 
-            next_cluster = struct.unpack('<I', entry_data)[0]
-            # En FAT32, los 4 bits más significativos se ignoran
-            next_cluster &= 0x0FFFFFFF
-            
-            if next_cluster >= 0x0FFFFFF8: # EOF (End of File)
+            if next_cluster >= eof_marker: # EOF (End of File)
                 break
-            if next_cluster == 0x0FFFFFF7: # Clúster defectuoso
+            if next_cluster == bad_marker: # Clúster defectuoso
                 break
-            if next_cluster == 0: # Libre (no debería pasar en una cadena asignada)
+            if next_cluster == 0: # Libre
                 break
                 
             current_cluster = next_cluster
@@ -130,13 +181,21 @@ class FATParser:
         ensamblando nombres largos (VFAT).
         """
         entries = []
-        chain = self.get_fat_chain(start_cluster)
         
         # Leer todos los datos del directorio
         dir_data = bytearray()
-        for cluster in chain:
-            offset = self.get_cluster_offset(cluster)
-            dir_data.extend(self.data_source.read(offset, self.get_cluster_size()))
+        
+        if start_cluster == 0 and self.boot_sector.fat_type in (12, 16):
+            # Directorio raiz fijo de FAT12/16
+            fat_size_bytes = self.boot_sector.num_fats * self.boot_sector.sectors_per_fat * self.boot_sector.bytes_per_sector
+            root_offset = self.boot_sector.get_fat_start_offset() + fat_size_bytes
+            root_size = self.boot_sector.root_entry_count * 32
+            dir_data.extend(self.data_source.read(root_offset, root_size))
+        else:
+            chain = self.get_fat_chain(start_cluster)
+            for cluster in chain:
+                offset = self.get_cluster_offset(cluster)
+                dir_data.extend(self.data_source.read(offset, self.get_cluster_size()))
             
         idx = 0
         lfn_buffer = {}

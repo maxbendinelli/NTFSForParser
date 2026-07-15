@@ -6,6 +6,7 @@ from core.utils import hexdump, print_breakdown
 from fs.ntfs_parser import NTFSParser
 from fs.fat_parser import FATParser
 from fs.ext4_parser import Ext4Parser
+from fs.exfat_parser import exFATParser
 from fs.carver import FileCarver, SIGNATURES
 
 class NTFSShell(cmd.Cmd):
@@ -226,14 +227,23 @@ class NTFSShell(cmd.Cmd):
             
             # Inicializar parser según el tipo
             if part.type_code == 0x07:
-                self.current_parser = NTFSParser(self.data_source, part)
-                self.current_directory_id = 5 # Root MFT ID
-                print(_("    Sistema de archivos detectado: NTFS"))
-            elif part.type_code in (0x0B, 0x0C):
+                # Leer el sector de arranque de la particion para discriminar NTFS de exFAT
+                sect0 = self.data_source.read(part.start_offset, 512)
+                if len(sect0) >= 11 and sect0[3:11] == b'EXFAT   ':
+                    self.current_parser = exFATParser(self.data_source, part)
+                    self.current_directory_id = self.current_parser.boot_sector.root_directory_cluster
+                    print(_("    Sistema de archivos detectado: exFAT"))
+                else:
+                    self.current_parser = NTFSParser(self.data_source, part)
+                    self.current_directory_id = 5 # Root MFT ID
+                    print(_("    Sistema de archivos detectado: NTFS"))
+            elif part.type_code in (0x01, 0x04, 0x06, 0x0E, 0x0B, 0x0C):
                 self.current_parser = FATParser(self.data_source, part)
                 self.current_directory_id = self.current_parser.boot_sector.root_cluster
-                if self.current_directory_id == 0: self.current_directory_id = 2
-                print(_("    Sistema de archivos detectado: FAT32"))
+                if self.current_parser.boot_sector.fat_type == 32 and self.current_directory_id == 0:
+                    self.current_directory_id = 2
+                fat_name = f"FAT{self.current_parser.boot_sector.fat_type}"
+                print(_("    Sistema de archivos detectado: {name}").format(name=fat_name))
             elif part.type_code == 0x83:
                 self.current_parser = Ext4Parser(self.data_source, part)
                 self.current_directory_id = 2 # Inodo root de ext4
@@ -466,10 +476,16 @@ class NTFSShell(cmd.Cmd):
                     pass
             print(_("\n[+] Fin del escaneo."))
             
-        elif isinstance(self.current_parser, FATParser):
+        elif isinstance(self.current_parser, (FATParser, exFATParser)):
             print(_("\n[+] Leyendo directorio '{path}' (Clúster: {dir_id})...").format(path=self.current_path, dir_id=self.current_directory_id))
             try:
-                self.fat_files_cache = self.current_parser.get_directory_entries(self.current_directory_id)
+                if isinstance(self.current_parser, exFATParser):
+                    no_fat_chain = getattr(self, 'current_directory_no_fat_chain', False)
+                    size = getattr(self, 'current_directory_size', 0)
+                    self.fat_files_cache = self.current_parser.get_directory_entries(self.current_directory_id, no_fat_chain, size)
+                else:
+                    self.fat_files_cache = self.current_parser.get_directory_entries(self.current_directory_id)
+                    
                 print(_("{id:<8} | {type:<6} | {status:<10} | {size:<10} | {mod:<20} | {name}").format(id="ID", type="Tipo", status="Estado", size="Tamaño", mod="Modificación", name="Nombre"))
                 print("-" * 90)
                 for idx, entry in enumerate(self.fat_files_cache):
@@ -515,12 +531,19 @@ class NTFSShell(cmd.Cmd):
                     if not self.current_path: self.current_path = "/"
                 except:
                     print(_("Error al leer el directorio padre."))
-            elif isinstance(self.current_parser, FATParser):
+            elif isinstance(self.current_parser, (FATParser, exFATParser)):
                 for entry in self.fat_files_cache:
                     if entry.name == "..":
                         self.current_directory_id = entry.start_cluster
-                        if self.current_directory_id == 0:
-                            self.current_directory_id = 2 # Root fallback
+                        if isinstance(self.current_parser, FATParser):
+                            if self.current_directory_id == 0:
+                                self.current_directory_id = 2 # Root fallback
+                        else: # exFAT
+                            if self.current_directory_id == 0:
+                                self.current_directory_id = self.current_parser.boot_sector.root_directory_cluster
+                            self.current_directory_no_fat_chain = getattr(entry, 'no_fat_chain', False)
+                            self.current_directory_size = getattr(entry, 'size', 0)
+                            
                         self.current_path = "/".join(self.current_path.rstrip("/").split("/")[:-1])
                         if not self.current_path: self.current_path = "/"
                         self.update_prompt()
@@ -557,13 +580,20 @@ class NTFSShell(cmd.Cmd):
                 else:
                     print(_("Directorio '{target}' no encontrado (asegúrate de ejecutar 'ls' antes).").format(target=target))
                     
-            elif isinstance(self.current_parser, FATParser):
+            elif isinstance(self.current_parser, (FATParser, exFATParser)):
                 for entry in self.fat_files_cache:
                     if entry.name.lower() == target.lower():
                         if entry.is_directory:
                             self.current_directory_id = entry.start_cluster
-                            if self.current_directory_id == 0:
-                                self.current_directory_id = 2
+                            if isinstance(self.current_parser, FATParser):
+                                if self.current_directory_id == 0:
+                                    self.current_directory_id = 2
+                            else: # exFAT
+                                if self.current_directory_id == 0:
+                                    self.current_directory_id = self.current_parser.boot_sector.root_directory_cluster
+                                self.current_directory_no_fat_chain = entry.no_fat_chain
+                                self.current_directory_size = entry.size
+                                
                             self.current_path = self.current_path.rstrip("/") + "/" + entry.name
                             self.update_prompt()
                             return
@@ -719,7 +749,7 @@ class NTFSShell(cmd.Cmd):
                     print(f"    Run {idx+1}: Empieza en el Clúster Lógico {run['start_cluster']} -> Ocupa {run['length']} clúster(es)")
                     print(f"            (Usa 'go cluster {run['start_cluster']}' para ver su contenido en disco)")
                     
-            elif isinstance(self.current_parser, FATParser):
+            elif isinstance(self.current_parser, (FATParser, exFATParser)):
                 if file_id < 0 or file_id >= len(self.fat_files_cache):
                     print("ID fuera de rango. Ejecuta 'ls' primero.")
                     return
@@ -729,7 +759,11 @@ class NTFSShell(cmd.Cmd):
                     return
                     
                 print(f"\n[+] Cadena FAT (Fragmentación de clústeres) para '{entry.name}':")
-                chain = self.current_parser.get_fat_chain(entry.start_cluster)
+                if isinstance(self.current_parser, exFATParser):
+                    chain = self.current_parser.get_fat_chain(entry.start_cluster, entry.no_fat_chain, entry.size)
+                else:
+                    chain = self.current_parser.get_fat_chain(entry.start_cluster)
+                    
                 for idx, cluster in enumerate(chain):
                     print(f"    Bloque {idx+1}: Clúster Lógico {cluster}")
                 print(f"    -> Total: {len(chain)} clúster(es)")
@@ -795,7 +829,7 @@ class NTFSShell(cmd.Cmd):
                     return
                 if target_lower in self.ntfs_files_cache:
                     file_id = self.ntfs_files_cache[target_lower]
-            elif isinstance(self.current_parser, FATParser):
+            elif isinstance(self.current_parser, (FATParser, exFATParser)):
                 for idx, entry in enumerate(self.fat_files_cache):
                     if entry.name.lower() == target_lower:
                         file_id = idx
@@ -830,14 +864,18 @@ class NTFSShell(cmd.Cmd):
                 else:
                     data_content = self.current_parser.read_data_runs(selected_stream['runs'], selected_stream['size'])
                     
-            elif isinstance(self.current_parser, FATParser):
+            elif isinstance(self.current_parser, (FATParser, exFATParser)):
                 if file_id < 0 or file_id >= len(self.fat_files_cache):
                     print(_("ID fuera de rango. Ejecuta 'ls' primero."))
                     return
                 entry = self.fat_files_cache[file_id]
                 file_name = entry.name
                 if entry.size > 0 and entry.start_cluster >= 2:
-                    chain = self.current_parser.get_fat_chain(entry.start_cluster)
+                    if isinstance(self.current_parser, exFATParser):
+                        chain = self.current_parser.get_fat_chain(entry.start_cluster, entry.no_fat_chain, entry.size)
+                    else:
+                        chain = self.current_parser.get_fat_chain(entry.start_cluster)
+                        
                     data_buffer = bytearray()
                     for cluster in chain:
                         offset = self.current_parser.get_cluster_offset(cluster)
@@ -924,13 +962,17 @@ class NTFSShell(cmd.Cmd):
                 else:
                     data_content = self.current_parser.read_data_runs(selected_stream['runs'], selected_stream['size'])
                     
-            elif isinstance(self.current_parser, FATParser):
+            elif isinstance(self.current_parser, (FATParser, exFATParser)):
                 if file_id < 0 or file_id >= len(self.fat_files_cache):
                     print("ID fuera de rango. Ejecuta 'ls' primero.")
                     return
                 entry = self.fat_files_cache[file_id]
                 if entry.size > 0 and entry.start_cluster >= 2:
-                    chain = self.current_parser.get_fat_chain(entry.start_cluster)
+                    if isinstance(self.current_parser, exFATParser):
+                        chain = self.current_parser.get_fat_chain(entry.start_cluster, entry.no_fat_chain, entry.size)
+                    else:
+                        chain = self.current_parser.get_fat_chain(entry.start_cluster)
+                        
                     data_buffer = bytearray()
                     for cluster in chain:
                         offset = self.current_parser.get_cluster_offset(cluster)
@@ -1080,7 +1122,7 @@ class NTFSShell(cmd.Cmd):
                     data_content = self.current_parser.read_data_runs(selected_stream['runs'], selected_stream['size'])
                     print(_("    -> Tipo: No Residente (reconstruido mediante {count} fragmentos/runs)").format(count=len(selected_stream['runs'])))
                     
-            elif isinstance(self.current_parser, FATParser):
+            elif isinstance(self.current_parser, (FATParser, exFATParser)):
                 if file_id < 0 or file_id >= len(self.fat_files_cache):
                     print(_("ID fuera de rango. Ejecuta 'ls' primero."))
                     return
@@ -1093,12 +1135,19 @@ class NTFSShell(cmd.Cmd):
                     print(_("El archivo borrado tiene tamaño 0 o no tiene clúster asignado."))
                     return
                     
-                # Recuperación contigua (FAT32 no retiene cadena FAT para borrados)
-                print(_("[+] Intentando recuperación contigua en FAT32 de '{name}' (Inicio: {cluster}, Tamaño: {size} bytes)...").format(
-                    name=entry.name, cluster=entry.start_cluster, size=entry.size
-                ))
-                offset = self.current_parser.get_cluster_offset(entry.start_cluster)
-                data_content = self.data_source.read(offset, entry.size)
+                if isinstance(self.current_parser, exFATParser):
+                    if entry.no_fat_chain:
+                        print(_("[+] Recuperando archivo borrado en exFAT de '{name}' (Archivo CONTIGUO - Reconstrucción 100% integra)...").format(name=entry.name))
+                    else:
+                        print(_("[+] Intentando recuperación contigua en exFAT de '{name}' (Archivo fragmentado - la cadena FAT fue borrada)...").format(name=entry.name))
+                    offset = self.current_parser.get_cluster_offset(entry.start_cluster)
+                    data_content = self.data_source.read(offset, entry.size)
+                else: # FATParser (FAT12/16/32)
+                    print(_("[+] Intentando recuperación contigua en FAT de '{name}' (Inicio: {cluster}, Tamaño: {size} bytes)...").format(
+                        name=entry.name, cluster=entry.start_cluster, size=entry.size
+                    ))
+                    offset = self.current_parser.get_cluster_offset(entry.start_cluster)
+                    data_content = self.data_source.read(offset, entry.size)
                 
             else:
                 print(_("[!] La recuperación de borrados basada en metadatos no está disponible para este sistema de archivos."))

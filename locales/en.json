@@ -164,5 +164,11 @@
     "[+] Intentando recuperación contigua en FAT32 de '{name}' (Inicio: {cluster}, Tamaño: {size} bytes)...": "[+] Attempting contiguous FAT32 recovery of '{name}' (Start: {cluster}, Size: {size} bytes)...",
     "[!] La recuperación de borrados basada en metadatos no está disponible para este sistema de archivos.": "[!] Metadata-based deleted recovery is not available for this file system.",
     "[+] ¡Archivo recuperado con éxito en {dest}!": "[+] File recovered successfully to {dest}!",
-    "[!] No se pudo extraer contenido para la recuperación.": "[!] Could not extract content for recovery."
+    "[!] No se pudo extraer contenido para la recuperación.": "[!] Could not extract content for recovery.",
+
+    "    Sistema de archivos detectado: exFAT": "    Detected file system: exFAT",
+    "    Sistema de archivos detectado: {name}": "    Detected file system: {name}",
+    "[+] Recuperando archivo borrado en exFAT de '{name}' (Archivo CONTIGUO - Reconstrucción 100% integra)...": "[+] Recovering deleted exFAT file '{name}' (CONTIGUOUS file - 100% intact recovery)...",
+    "[+] Intentando recuperación contigua en exFAT de '{name}' (Archivo fragmentado - la cadena FAT fue borrada)...": "[+] Attempting contiguous exFAT recovery of '{name}' (Fragmented file - FAT chain was cleared)...",
+    "[+] Intentando recuperación contigua en FAT de '{name}' (Inicio: {cluster}, Tamaño: {size} bytes)...": "[+] Attempting contiguous FAT recovery of '{name}' (Start: {cluster}, Size: {size} bytes)..."
 }
