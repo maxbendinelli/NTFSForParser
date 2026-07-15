@@ -326,10 +326,40 @@ def verify_all_filesystems():
     assert len(rec_ntfs_data) > 0
     os.remove(rec_ntfs_dest)
 
+    # ------------------ 9. TEST DE CARVING CONFIGURABLE Y SIGNATURES.CONF ------------------
+    print("\n[+] 9. Validando File Carving Configurable y Archivo de Configuración...")
+    
+    config_carve_out = "scratch/carve_config_out"
+    if os.path.exists(config_carve_out):
+        shutil.rmtree(config_carve_out)
+    os.makedirs(config_carve_out, exist_ok=True)
+    
+    # Ejecutar carve con --max-size 6 bytes
+    shell.do_select("2")
+    print("    -> Ejecutando carve con --max-size 6...")
+    shell.do_carve(f"{config_carve_out} jpg --max-size 6")
+    
+    files_config = os.listdir(config_carve_out)
+    print(f"       Archivos recuperados con limitación: {files_config}")
+    assert len(files_config) >= 1
+    
+    # Leer el tamaño del archivo recuperado
+    with open(os.path.join(config_carve_out, files_config[0]), 'rb') as f:
+        carved_data = f.read()
+    print(f"       Tamaño del archivo recuperado con max-size=6: {len(carved_data)} bytes")
+    assert len(carved_data) == 6
+    
+    # Validar que signatures.conf existe en el directorio del proyecto
+    assert os.path.exists("signatures.conf")
+    print("    [OK] signatures.conf se creó automáticamente con éxito.")
+    
+    # Limpieza del Test 9
+    shutil.rmtree(config_carve_out)
+
     # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING Y RECOVERY SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY Y CONFIGURACIONES SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()

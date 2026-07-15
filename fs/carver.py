@@ -8,6 +8,7 @@ Diseñado con un enfoque didáctico para mostrar la técnica de recuperación ci
 
 import os
 import re
+import configparser
 
 
 # ---------------------------------------------------------------------------
@@ -571,6 +572,58 @@ SIGNATURES = [
 ]
 
 
+def generate_default_signatures_config(config_path="signatures.conf"):
+    """Genera el archivo signatures.conf con el set de firmas predefinido."""
+    config = configparser.ConfigParser()
+    for sig in SIGNATURES:
+        section_name = sig["name"]
+        config[section_name] = {
+            "ext": sig["ext"],
+            "header": sig["header"].hex(),
+            "footer": sig["footer"].hex() if sig["footer"] else "",
+            "max_size": str(sig["max_size"])
+        }
+    with open(config_path, 'w', encoding='utf-8') as f:
+        config.write(f)
+
+
+def load_signatures(config_path="signatures.conf"):
+    """Carga firmas desde el archivo signatures.conf. Lo crea si no existe."""
+    if not os.path.exists(config_path):
+        generate_default_signatures_config(config_path)
+
+    config = configparser.ConfigParser()
+    config.read(config_path, encoding='utf-8')
+    signatures = []
+    for section in config.sections():
+        try:
+            ext = config.get(section, 'ext').strip()
+            header_hex = config.get(section, 'header').strip()
+            header = bytes.fromhex(header_hex)
+
+            footer = None
+            if config.has_option(section, 'footer'):
+                footer_hex = config.get(section, 'footer').strip()
+                if footer_hex:
+                    footer = bytes.fromhex(footer_hex)
+
+            max_size = 10 * 1024 * 1024  # 10 MB por defecto
+            if config.has_option(section, 'max_size'):
+                max_size = config.getint(section, 'max_size')
+
+            signatures.append({
+                "name": section,
+                "ext": ext,
+                "header": header,
+                "footer": footer,
+                "max_size": max_size
+            })
+        except Exception as e:
+            print(f"[!] Advertencia: Error al parsear la firma '{section}' en {config_path}: {e}")
+
+    return signatures
+
+
 class FileCarver:
     """
     Realiza File Carving ciego sobre los datos crudos de una partición.
@@ -582,19 +635,28 @@ class FileCarver:
     output_dir   : directorio donde se guardarán los archivos recuperados
     chunk_size   : tamaño del chunk de lectura (16 MB por defecto)
     progress_cb  : callback(percent, status_str) para actualizar la UI
+    max_size_override : si se especifica, sobrescribe el tamaño máximo de carving para todas las firmas
     """
 
     CHUNK_SIZE = 16 * 1024 * 1024  # 16 MB
     OVERLAP    =  4 * 1024 * 1024  # 4 MB de solapamiento entre chunks
 
     def __init__(self, data_source, partition, output_dir,
-                 progress_cb=None, custom_signatures=None):
+                 progress_cb=None, custom_signatures=None, max_size_override=None):
         self.data_source = data_source
         self.partition = partition
         self.output_dir = output_dir
         self.progress_cb = progress_cb or (lambda pct, msg: None)
 
-        self.signatures = custom_signatures if custom_signatures is not None else SIGNATURES
+        raw_sigs = custom_signatures if custom_signatures is not None else load_signatures()
+
+        # Aplicar el override del tamaño máximo de carving si está presente
+        self.signatures = []
+        for sig in raw_sigs:
+            new_sig = sig.copy()
+            if max_size_override is not None:
+                new_sig["max_size"] = max_size_override
+            self.signatures.append(new_sig)
 
         # Precompilar headers como patrones de bytes para búsqueda rápida
         self._compiled = [

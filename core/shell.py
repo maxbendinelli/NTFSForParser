@@ -7,7 +7,7 @@ from fs.ntfs_parser import NTFSParser
 from fs.fat_parser import FATParser
 from fs.ext4_parser import Ext4Parser
 from fs.exfat_parser import exFATParser
-from fs.carver import FileCarver, SIGNATURES
+from fs.carver import FileCarver, SIGNATURES, load_signatures
 
 class NTFSShell(cmd.Cmd):
     @property
@@ -1473,8 +1473,10 @@ class NTFSShell(cmd.Cmd):
           carve <directorio_destino>     → guarda en el directorio indicado, todos los tipos
           carve [dir] jpg pdf png        → filtra tipos específicos
           carve --disk [dir] [tipos...]  → fuerza el escaneo de todo el disco/imagen forense completa
+          carve --max-size 50MB          → sobrescribe el tamaño máximo de carving
+          carve --types jpg,png          → filtra tipos específicos de forma explícita
 
-        Tipos soportados: jpg, png, pdf, zip, exe, gif, rar, mp3, db, elf
+        Tipos soportados: definidos en signatures.conf (por defecto: jpg, png, pdf, zip, exe, gif, rar, mp3, db, elf...)
         Si no se especifica directorio, se usa el directorio de trabajo actual.
         """
         import os
@@ -1505,33 +1507,75 @@ class NTFSShell(cmd.Cmd):
         else:
             target_partition = self.current_parser.partition
 
-        KNOWN_TYPES = {s["ext"].lower() for s in SIGNATURES}
+        # Configurar override de tamaño máximo
+        max_size_override = None
+        if "--max-size" in args:
+            try:
+                idx = args.index("--max-size")
+                if idx + 1 < len(args):
+                    val_str = args[idx + 1].upper()
+                    if val_str.endswith("KB"):
+                        max_size_override = int(val_str[:-2]) * 1024
+                    elif val_str.endswith("MB"):
+                        max_size_override = int(val_str[:-2]) * 1024 * 1024
+                    elif val_str.endswith("GB"):
+                        max_size_override = int(val_str[:-2]) * 1024 * 1024 * 1024
+                    else:
+                        max_size_override = int(val_str)
+                    args.pop(idx + 1)
+                    args.pop(idx)
+                else:
+                    print("Falta el valor para --max-size")
+                    return
+            except ValueError:
+                print("Tamaño máximo inválido. Ejemplo: --max-size 50MB o --max-size 52428800")
+                return
+
+        # Cargar firmas desde el archivo de configuración
+        loaded_sigs = load_signatures()
+        KNOWN_TYPES = {s["ext"].lower() for s in loaded_sigs}
+
+        # Procesar --types si está explícito
+        filter_types = []
+        if "--types" in args:
+            try:
+                idx = args.index("--types")
+                if idx + 1 < len(args):
+                    types_val = args[idx + 1].lower()
+                    if types_val != "all":
+                        filter_types = [t.strip() for t in types_val.split(",") if t.strip()]
+                    args.pop(idx + 1)
+                    args.pop(idx)
+                else:
+                    print("Falta el valor para --types")
+                    return
+            except Exception:
+                print("Error al procesar --types")
+                return
 
         # Detectar si el primer argumento es un tipo conocido o un directorio
         if not args:
-            # Sin argumentos: usar directorio actual
             output_dir = os.getcwd()
-            filter_types = []
-        elif args[0].lower() in KNOWN_TYPES:
-            # El primer arg ya es un tipo de archivo, no un directorio
+        elif args[0].lower() in KNOWN_TYPES or args[0].lower() == "all":
             output_dir = os.getcwd()
-            filter_types = [t.lower() for t in args]
+            if not filter_types:
+                filter_types = [t.lower() for t in args if t.lower() != "all"]
         else:
-            # El primer arg es el directorio destino
             output_dir = args[0]
-            filter_types = [t.lower() for t in args[1:]]
+            if not filter_types:
+                filter_types = [t.lower() for t in args[1:] if t.lower() != "all"]
 
         # Filtrar firmas según los tipos solicitados
         if filter_types:
-            custom_sigs = [s for s in SIGNATURES if s["ext"].lower() in filter_types]
+            custom_sigs = [s for s in loaded_sigs if s["ext"].lower() in filter_types]
             if not custom_sigs:
-                print(_("[!] Ningún tipo válido reconocido. Tipos disponibles: {tipos}").format(tipos=', '.join(s['ext'] for s in SIGNATURES)))
+                print(_("[!] Ningún tipo válido reconocido. Tipos disponibles: {tipos}").format(tipos=', '.join(sorted(list(KNOWN_TYPES)))))
                 return
         else:
-            custom_sigs = None  # Usar todas las firmas
+            custom_sigs = loaded_sigs
 
         # Resumen previo
-        sigs_to_use = custom_sigs if custom_sigs else SIGNATURES
+        sigs_to_use = custom_sigs
         if use_entire_disk:
             print(_("\n[+] Iniciando File Carving automatizado en toda la imagen de disco..."))
             print(_("    Directorio de salida : {out_dir}").format(out_dir=output_dir))
@@ -1565,6 +1609,7 @@ class NTFSShell(cmd.Cmd):
                 output_dir=output_dir,
                 progress_cb=progress,
                 custom_signatures=custom_sigs,
+                max_size_override=max_size_override,
             )
             results = carver.carve()
 
