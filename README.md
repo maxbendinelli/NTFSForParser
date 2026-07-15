@@ -7,7 +7,7 @@
 
 **NTFSForParser** es un framework interactivo desarrollado en Python, diseñado con un enfoque netamente **educativo y pedagógico**. Su objetivo es permitir a los estudiantes de informática forense sumergirse en las profundidades de los sistemas de archivos, entendiendo las estructuras de bajo nivel (hexadecimal), metadatos, y técnicas de recuperación sin depender de interfaces gráficas complejas o cajas negras.
 
-Actualmente soporta análisis profundo sobre particiones **FAT32** y **NTFS**, e inspección base para **Ext4** (Linux), procesando tanto imágenes crudas (`.dd`, `.raw`, fragmentadas `.001`) como imágenes adquiridas en formato **EnCase (`.e01`)**.
+Actualmente soporta análisis profundo sobre particiones **FAT12**, **FAT16**, **FAT32**, **exFAT** y **NTFS**, e inspección base para **Ext4** (Linux), procesando tanto imágenes crudas (`.dd`, `.raw`, fragmentadas `.001`) como imágenes adquiridas en formato **EnCase (`.e01`)**.
 
 ---
 
@@ -15,10 +15,10 @@ Actualmente soporta análisis profundo sobre particiones **FAT32** y **NTFS**, e
 
 1. **Shell Interactivo Forense:** Navega por la imagen de disco utilizando una interfaz de línea de comandos similar a Bash, permitiendo saltar de sector en sector, interpretar clústeres, o moverte por el árbol de directorios de la imagen investigada.
 2. **Soporte MACB Total:** Parseo y extracción nativa de metadatos temporales:
-   - Fechas MS-DOS para entornos FAT.
+   - Fechas MS-DOS para entornos FAT12/16/32 y exFAT.
    - Fechas FILETIME (`$STANDARD_INFORMATION`) de 100-nanosegundos para MFT (NTFS).
 3. **Navegación Jerárquica:** El comando `cd` te permite entrar a carpetas y el comando `ls` te muestra el contenido en vivo.
-4. **Data Carving y Recuperación:** Usa el comando `recover` para demostrar la técnica de *File Carving* de archivos borrados contiguos en FAT32 directamente desde la estructura de metadatos.
+4. **Data Carving y Recuperación:** Usa el comando `recover` para demostrar la reconstrucción forense a partir de metadatos de archivos borrados: NTFS (reconstrucción completa fragmentada vía Data Runs), exFAT (reconstrucción 100% íntegra si es contiguo vía `NoFatChain` o contigua), y FAT12/16/32 (extracción contigua).
 5. **Comprobación de Integridad Forense Avanzada:** Usa `hash_check` para leer la imagen y verificar hashes. Para E01, extrae y compara hashes MD5/SHA1 internos y realiza comprobaciones de integridad CRC por chunk.
 6. **File Carving Automatizado:** Con soporte para más de 50 firmas de archivos estructurados por categorías (imágenes, audios, vídeos, documentos, comprimidos, ejecutables, bases de datos, llaves criptográficas, registros de Windows, etc.) usando la técnica de Magic Bytes.
 7. **Múltiples Formatos Soportados:** Imágenes RAW completas, Divididas/Split (001, 002) y contenedores EnCase (E01).
@@ -75,8 +75,8 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 - `identify sector <num>` (o `cluster`): Lee los Magic Bytes y firmas de la cabecera e intenta adivinar qué estructura es (VBR, Registro MFT, Inicio de PDF, Zip, JPEG, etc).
 
 ### Navegación del File System (FAT / NTFS / Ext4)
-- `vbr`: Desgrana y traduce los valores del Volume Boot Record o BPB.
-- `ls`: Lista los archivos, directorios, sus estados de borrado y fechas de modificación. Soporta lectura de Inodo 2 en Ext4.
+- `vbr`: Desgrana y traduce los valores del Volume Boot Record o BPB. Soporta decodificación detallada de parámetros VBR para FAT12, FAT16, FAT32, exFAT y NTFS.
+- `ls`: Lista los archivos, directorios, sus estados de borrado y fechas de modificación. Soporta lectura de Inodo 2 en Ext4 y directorios exFAT.
 - `cd <carpeta>`: Adéntrate en los directorios del File System. Usa `cd ..` para volver atrás.
 - `info <id>`: Muestra toda la meta-información técnica de ese archivo (Atributos, Tamaño, Fechas completas, Residentes vs No-Residentes). ¡Avisa si existen flujos ADS ocultos en NTFS!
 - `runs <id | nombre>`: Imprime las direcciones físicas del disco donde el archivo guarda su información. Soporta Cadenas FAT, Data Runs (NTFS) y Árbol de Extents (Ext4). Puedes buscar flujos específicos como `runs 12:Zone.Identifier`.
@@ -111,7 +111,9 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 
 - ✅ ~~**Verificación Completa E01**~~: Implementado — `hash_check` lee los hashes almacenados en el contenedor E01 (MD5/SHA1), verifica los CRC internos por chunk y compara contra el hash calculado en tiempo real. Soporta también SHA256 como argumento opcional.
 - ✅ ~~**File Carving Automatizado**~~: Implementado — usa `carve <dir> [tipos...]` para recuperar archivos eliminados por Magic Bytes (JPG, PNG, PDF, ZIP, EXE, GIF, RAR, MP3, SQLite, ELF).
-- ✅ ~~**Expansión de Idiomas (i18n)**~~: Implementado — soporte completo del 100% de los comandos interactivos, errores, metadatos y parsers de particiones en Español e Inglés. Se puede inicializar con el parámetro `--lang en`.
+- ✅ **Soporte FAT12, FAT16 y exFAT**: Implementado — decodificación de clústeres FAT12 de 12 bits, FAT16 de 16 bits, y exFAT VBR parameter shifts, Allocation Bitmap (`NoFatChain`) y agrupaciones de sets de directorios de 32 bytes.
+- ✅ **Entorno de Pruebas Integrado**: Implementado — un generador binario de disco virtual GPT (`scratch/generate_test_image.py`) que crea y puebla 6 particiones válidas a bajo nivel con archivos activos y borrados, junto a una suite de validación automatizada (`scratch/test_mock_image.py`).
+- ✅ **Expansión de Idiomas (i18n)**: Implementado — soporte completo del 100% de los comandos interactivos, errores, metadatos y parsers de particiones en Español e Inglés. Se puede inicializar con el parámetro `--lang en`.
 
 ---
 
