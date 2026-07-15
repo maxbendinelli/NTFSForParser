@@ -31,6 +31,9 @@ def main():
     parser.add_argument("--dump-clusters", nargs=3, metavar=('START', 'END_OR_COUNT', 'DEST'), help="Vuelca un rango de clústeres/bloques a disco (requiere --part). Ej: --dump-clusters 100 +50 out.bin")
     parser.add_argument("--part", type=int, help="Índice de la partición para comandos lógicos")
     parser.add_argument("--count", type=int, default=1, help="Cantidad de sectores/clústeres continuos a procesar")
+    parser.add_argument("--carve", type=str, metavar='DEST_DIR', help="Realiza carving de archivos en la partición (requiere --part) o en todo el disco si no se especifica --part")
+    parser.add_argument("--types", type=str, help="Filtra tipos de archivos a buscar (separados por comas, ej: jpg,png)")
+    parser.add_argument("--max-size", type=str, help="Sobrescribe el tamaño máximo de carving (ej: 50MB, 2048KB)")
     parser.add_argument("--lang", type=str, default="es", choices=["es", "en"], help="Idioma de la interfaz (es, en)")
     
     args = parser.parse_args()
@@ -122,6 +125,20 @@ def main():
             if args.dump_clusters is not None:
                 shell.do_dump_clusters(f"{args.dump_clusters[0]} {args.dump_clusters[1]} {args.dump_clusters[2]}")
                 
+            return
+            
+        if args.carve is not None:
+            shell = NTFSShell(data_source, mbr_parser)
+            if args.part is not None:
+                shell.do_select(str(args.part))
+            
+            carve_cmds = [args.carve]
+            if args.types:
+                carve_cmds.extend(["--types", args.types])
+            if args.max_size:
+                carve_cmds.extend(["--max-size", args.max_size])
+                
+            shell.do_carve(" ".join(carve_cmds))
             return
             
         # Si no hay parámetros especiales, lanzar el Shell Interactivo
