@@ -225,32 +225,70 @@ class NTFSShell(cmd.Cmd):
             
             print(_("\n[+] Partición {idx} seleccionada.").format(idx=idx))
             
-            # Inicializar parser según el tipo
-            if part.type_code == 0x07:
-                # Leer el sector de arranque de la particion para discriminar NTFS de exFAT
-                sect0 = self.data_source.read(part.start_offset, 512)
-                if len(sect0) >= 11 and sect0[3:11] == b'EXFAT   ':
-                    self.current_parser = exFATParser(self.data_source, part)
-                    self.current_directory_id = self.current_parser.boot_sector.root_directory_cluster
-                    print(_("    Sistema de archivos detectado: exFAT"))
-                else:
-                    self.current_parser = NTFSParser(self.data_source, part)
-                    self.current_directory_id = 5 # Root MFT ID
-                    print(_("    Sistema de archivos detectado: NTFS"))
-            elif part.type_code in (0x01, 0x04, 0x06, 0x0E, 0x0B, 0x0C):
-                self.current_parser = FATParser(self.data_source, part)
-                self.current_directory_id = self.current_parser.boot_sector.root_cluster
-                if self.current_parser.boot_sector.fat_type == 32 and self.current_directory_id == 0:
-                    self.current_directory_id = 2
-                fat_name = f"FAT{self.current_parser.boot_sector.fat_type}"
-                print(_("    Sistema de archivos detectado: {name}").format(name=fat_name))
-            elif part.type_code == 0x83:
+            # Inicializar parser mediante autodetección en caliente del sector de arranque (VBR)
+            sect0 = self.data_source.read(part.start_offset, 512)
+            sb = self.data_source.read(part.start_offset + 1024, 64)
+            
+            detected = False
+            
+            # 1. Deteccion exFAT
+            if len(sect0) >= 11 and sect0[3:11] == b'EXFAT   ':
+                self.current_parser = exFATParser(self.data_source, part)
+                self.current_directory_id = self.current_parser.boot_sector.root_directory_cluster
+                print(_("    Sistema de archivos detectado: exFAT"))
+                detected = True
+                
+            # 2. Deteccion NTFS
+            elif len(sect0) >= 11 and sect0[3:11] == b'NTFS    ':
+                self.current_parser = NTFSParser(self.data_source, part)
+                self.current_directory_id = 5 # Root MFT ID
+                print(_("    Sistema de archivos detectado: NTFS"))
+                detected = True
+                
+            # 3. Deteccion Ext4 (Firma 0xEF53 en offset 56 del Superbloque)
+            elif len(sb) >= 58 and sb[56:58] == b'\x53\xef':
                 self.current_parser = Ext4Parser(self.data_source, part)
-                self.current_directory_id = 2 # Inodo root de ext4
+                self.current_directory_id = 2 # Inodo root
                 print(_("    Sistema de archivos detectado: Ext4 (Linux)"))
-            else:
-                self.current_parser = None
-                print(_("    Sistema de archivos desconocido o no soportado para parseo automático."))
+                detected = True
+                
+            # 4. Deteccion FAT12/16/32 clasica (Firma 0x55AA al final y BPB razonable)
+            elif len(sect0) >= 512 and sect0[510:512] == b'\x55\xaa':
+                try:
+                    bytes_sec = struct.unpack('<H', sect0[11:13])[0]
+                    sec_clust = sect0[13]
+                    if bytes_sec in (512, 1024, 2048, 4096) and sec_clust in (1, 2, 4, 8, 16, 32, 64, 128):
+                        self.current_parser = FATParser(self.data_source, part)
+                        self.current_directory_id = self.current_parser.boot_sector.root_cluster
+                        if self.current_parser.boot_sector.fat_type == 32 and self.current_directory_id == 0:
+                            self.current_directory_id = 2
+                        fat_name = f"FAT{self.current_parser.boot_sector.fat_type}"
+                        print(_("    Sistema de archivos detectado: {name}").format(name=fat_name))
+                        detected = True
+                except Exception:
+                    pass
+            
+            # 5. Fallback heredado basado en codigos de particion MBR si la deteccion en caliente falla
+            if not detected:
+                if part.type_code == 0x07:
+                    # NTFS por defecto si falla VBR
+                    self.current_parser = NTFSParser(self.data_source, part)
+                    self.current_directory_id = 5
+                    print(_("    Sistema de archivos detectado: NTFS (Fallback)"))
+                elif part.type_code in (0x01, 0x04, 0x06, 0x0E, 0x0B, 0x0C):
+                    self.current_parser = FATParser(self.data_source, part)
+                    self.current_directory_id = self.current_parser.boot_sector.root_cluster
+                    if self.current_parser.boot_sector.fat_type == 32 and self.current_directory_id == 0:
+                        self.current_directory_id = 2
+                    fat_name = f"FAT{self.current_parser.boot_sector.fat_type}"
+                    print(_("    Sistema de archivos detectado: {name} (Fallback)").format(name=fat_name))
+                elif part.type_code == 0x83:
+                    self.current_parser = Ext4Parser(self.data_source, part)
+                    self.current_directory_id = 2
+                    print(_("    Sistema de archivos detectado: Ext4 (Fallback)"))
+                else:
+                    self.current_parser = None
+                    print(_("    Sistema de archivos desconocido o no soportado para parseo automático."))
                 
             self.current_path = "/"
             self.update_prompt()

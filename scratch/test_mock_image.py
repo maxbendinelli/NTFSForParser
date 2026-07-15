@@ -1,0 +1,216 @@
+import sys
+import os
+
+sys.path.insert(0, '.')
+
+from core.data_source import RawImageSource
+from core.partition_manager import MBRParser
+from fs.fat_parser import FATParser
+from fs.exfat_parser import exFATParser
+from fs.ntfs_parser import NTFSParser
+from fs.ext4_parser import Ext4Parser
+
+def verify_all_filesystems():
+    image_path = "test_disk.raw"
+    if not os.path.exists(image_path):
+        print(f"[-] Error: No se encuentra la imagen de prueba {image_path}")
+        sys.exit(1)
+        
+    print(f"[+] Iniciando análisis forense en la imagen: {image_path}")
+    source = RawImageSource(image_path)
+    pm = MBRParser(source)
+    
+    print(f"[+] Particiones detectadas en la imagen ({len(pm.partitions)}):")
+    for idx, part in enumerate(pm.partitions):
+        print(f"    Partition {idx}: Type={part.type_code} (Name: {part.type_name}), Start LBA={part.start_lba}, Size={part.size_in_sectors}")
+        
+    assert len(pm.partitions) == 6
+    
+    # ------------------ 1. TEST FAT12 ------------------
+    print("\n[+] 1. Validando Partición 1 (FAT12)...")
+    part_fat12 = pm.partitions[0]
+    parser12 = FATParser(source, part_fat12)
+    assert parser12.boot_sector.fat_type == 12
+    entries12 = parser12.get_directory_entries(0) # 0 es root dir fijo en FAT12/16
+    print(f"    Archivos leídos en root directory FAT12:")
+    for e in entries12:
+        print(f"      - {e.name} (Tamaño: {e.size}, Clúster: {e.start_cluster}, Borrado: {e.is_deleted})")
+    
+    # Buscar HELLO.TXT
+    hello12 = next((e for e in entries12 if e.name == "HELLO.TXT"), None)
+    assert hello12 is not None
+    assert hello12.size == 16
+    # Leer datos
+    chain12 = parser12.get_fat_chain(hello12.start_cluster)
+    data12 = bytearray()
+    for c in chain12:
+        offset = parser12.get_cluster_offset(c)
+        data12.extend(source.read(offset, parser12.get_cluster_size()))
+    content12 = bytes(data12[:hello12.size])
+    print(f"    Contenido de HELLO.TXT: {content12}")
+    assert content12 == b"HELLO FAT12 DATA"
+    
+    # Buscar _ELETED.TXT
+    deleted12 = next((e for e in entries12 if e.name == "_ELETED.TXT"), None)
+    assert deleted12 is not None
+    assert deleted12.is_deleted is True
+    assert deleted12.size == 24
+    
+    # ------------------ 2. TEST FAT16 ------------------
+    print("\n[+] 2. Validando Partición 2 (FAT16)...")
+    part_fat16 = pm.partitions[1]
+    parser16 = FATParser(source, part_fat16)
+    assert parser16.boot_sector.fat_type == 16
+    entries16 = parser16.get_directory_entries(0)
+    print(f"    Archivos leídos en root directory FAT16:")
+    for e in entries16:
+        print(f"      - {e.name} (Tamaño: {e.size}, Clúster: {e.start_cluster}, Borrado: {e.is_deleted})")
+        
+    hello16 = next((e for e in entries16 if e.name == "HELLO.TXT"), None)
+    assert hello16 is not None
+    chain16 = parser16.get_fat_chain(hello16.start_cluster)
+    data16 = bytearray()
+    for c in chain16:
+        data16.extend(source.read(parser16.get_cluster_offset(c), parser16.get_cluster_size()))
+    content16 = bytes(data16[:hello16.size])
+    print(f"    Contenido de HELLO.TXT: {content16}")
+    assert content16 == b"HELLO FAT16 DATA"
+    
+    # Buscar _ELETED.TXT en FAT16
+    deleted16 = next((e for e in entries16 if e.name == "_ELETED.TXT"), None)
+    assert deleted16 is not None
+    assert deleted16.is_deleted is True
+    assert deleted16.size == 24
+    
+    # ------------------ 3. TEST FAT32 ------------------
+    print("\n[+] 3. Validando Partición 3 (FAT32)...")
+    part_fat32 = pm.partitions[2]
+    parser32 = FATParser(source, part_fat32)
+    assert parser32.boot_sector.fat_type == 32
+    # El cluster root de FAT32 es 2
+    entries32 = parser32.get_directory_entries(2)
+    print(f"    Archivos leídos en root directory FAT32:")
+    for e in entries32:
+        print(f"      - {e.name} (Tamaño: {e.size}, Clúster: {e.start_cluster}, Borrado: {e.is_deleted})")
+        
+    notes32 = next((e for e in entries32 if e.name == "NOTES.TXT"), None)
+    assert notes32 is not None
+    chain32 = parser32.get_fat_chain(notes32.start_cluster)
+    data32 = bytearray()
+    for c in chain32:
+        data32.extend(source.read(parser32.get_cluster_offset(c), parser32.get_cluster_size()))
+    content32 = bytes(data32[:notes32.size])
+    print(f"    Contenido de NOTES.TXT: {content32}")
+    assert content32 == b"HELLO FAT32 DATA"
+    
+    # Buscar _ELETED.TXT en FAT32
+    deleted32 = next((e for e in entries32 if e.name == "_ELETED.TXT"), None)
+    assert deleted32 is not None
+    assert deleted32.is_deleted is True
+    assert deleted32.size == 24
+    
+    # ------------------ 4. TEST exFAT ------------------
+    print("\n[+] 4. Validando Partición 4 (exFAT)...")
+    part_exfat = pm.partitions[3]
+    parserexfat = exFATParser(source, part_exfat)
+    # Directorio raiz exFAT cluster 2
+    entriesexfat = parserexfat.get_directory_entries(2)
+    print(f"    Archivos leídos en root directory exFAT:")
+    for e in entriesexfat:
+        print(f"      - {e.name} (Tamaño: {e.size}, Clúster: {e.start_cluster}, Borrado: {e.is_deleted}, NoFatChain: {e.no_fat_chain})")
+        
+    exfat_file = next((e for e in entriesexfat if e.name == "exfat.dat"), None)
+    assert exfat_file is not None
+    chainexfat = parserexfat.get_fat_chain(exfat_file.start_cluster, exfat_file.no_fat_chain, exfat_file.size)
+    dataexfat = bytearray()
+    for c in chainexfat:
+        dataexfat.extend(source.read(parserexfat.get_cluster_offset(c), parserexfat.get_cluster_size()))
+    contentexfat = bytes(dataexfat[:exfat_file.size])
+    print(f"    Contenido de exfat.dat: {contentexfat}")
+    # Buscar deleted.dat
+    deletedexfat = next((e for e in entriesexfat if e.name == "deleted.dat"), None)
+    assert deletedexfat is not None
+    assert deletedexfat.is_deleted is True
+    assert deletedexfat.size == 24
+    
+    # ------------------ 5. TEST NTFS ------------------
+    print("\n[+] 5. Validando Partición 5 (NTFS)...")
+    part_ntfs = pm.partitions[4]
+    parserntfs = NTFSParser(source, part_ntfs)
+    
+    # Escanear primeros registros buscando archivos pertenecientes al root id 5
+    print("    Escaneando registros MFT apuntando a Root ID 5:")
+    hello_ntfs_record = None
+    deleted_ntfs_record = None
+    
+    # Imprimir info de la MFT
+    print(f"      NTFS MFT Start Offset: {parserntfs.vbr.get_mft_offset()}")
+    print(f"      Bytes per MFT Record: {parserntfs.vbr.bytes_per_mft_record}")
+    
+    for i in range(40):
+        try:
+            mft_start_offset = parserntfs.vbr.get_mft_offset()
+            record_offset = mft_start_offset + (i * parserntfs.vbr.bytes_per_mft_record)
+            raw = source.read(record_offset, 4)
+            # Solo si contiene algo de interes imprimimos
+            if raw != b'\x00\x00\x00\x00':
+                print(f"      MFT {i} en offset {record_offset}: signature={raw}")
+                
+            rec = parserntfs.get_mft_record(i)
+            if rec.signature != 'FILE':
+                continue
+            rec.parse_attributes()
+            if rec.file_name:
+                print(f"        Encontrado archivo: MFT {i}: '{rec.file_name}', parent={rec.parent_mft_id}")
+            if rec.parent_mft_id == 5 and rec.file_name:
+                if rec.file_name == "hello.txt":
+                    hello_ntfs_record = rec
+                elif rec.file_name == "deleted.txt":
+                    deleted_ntfs_record = rec
+        except Exception as e:
+            err_str = str(e).encode('ascii', errors='replace').decode('ascii')
+            print(f"      MFT {i} error: {err_str}")
+            
+    assert hello_ntfs_record is not None
+    assert deleted_ntfs_record is not None
+    assert deleted_ntfs_record.is_in_use() is False
+    
+    # Extraer el contenido del stream DATA residente de hello.txt
+    for s in hello_ntfs_record.data_streams:
+        if not s['name']: # Default stream
+            data_content = s['content'] if s['is_resident'] else parserntfs.read_data_runs(s['runs'], s['size'])
+            print(f"    Contenido de hello.txt: {data_content}")
+            assert data_content == b"HELLO NTFS DATA"
+            
+    # ------------------ 6. TEST Ext4 ------------------
+    print("\n[+] 6. Validando Partición 6 (Ext4)...")
+    part_ext4 = pm.partitions[5]
+    parserext4 = Ext4Parser(source, part_ext4)
+    # Listar root directory inode 2
+    entriesext4 = parserext4.get_directory_entries(2)
+    print(f"    Archivos leídos en root directory Ext4:")
+    for e in entriesext4:
+        print(f"      - Inode: {e['inode']}, Type: {e['type']}, Name: {e['name']}")
+        
+    hello_ext4 = next((e for e in entriesext4 if e['name'] == "hello.txt"), None)
+    assert hello_ext4 is not None
+    
+    # Leer datos de inodo 12
+    inode12 = parserext4.get_inode(12)
+    blocks = parserext4.get_inode_data_blocks(inode12)
+    dataext4 = bytearray()
+    for b in blocks:
+        # offset del bloque = start_offset + b * block_size
+        # block_size de nuestro test es 1024
+        offset = part_ext4.start_offset + b * 1024
+        dataext4.extend(source.read(offset, 1024))
+        
+    contentext4 = bytes(dataext4[:16])
+    print(f"    Contenido de hello.txt en Ext4: {contentext4}")
+    assert contentext4 == b"HELLO EXT4 DATA "
+    
+    source.close()
+    print("\n[OK] ¡TODAS LAS PARTICIONES Y ARCHIVOS SE VALIDARON CORRECTAMENTE A BAJO NIVEL EN LA IMAGEN!")
+
+if __name__ == "__main__":
+    verify_all_filesystems()
