@@ -132,6 +132,7 @@ El framework incluye herramientas nativas para simular imágenes de disco GPT co
 - ✅ **Soporte FAT12, FAT16 y exFAT**: Implementado — decodificación de clústeres FAT12 de 12 bits, FAT16 de 16 bits, y exFAT VBR parameter shifts, Allocation Bitmap (`NoFatChain`) y agrupaciones de sets de directorios de 32 bytes.
 - ✅ **Entorno de Pruebas Integrado**: Implementado — un generador binario de disco virtual GPT (`scratch/generate_test_image.py`) que crea y puebla 6 particiones válidas a bajo nivel con archivos activos y borrados, junto a una suite de validación automatizada (`scratch/test_mock_image.py`).
 - ✅ **Expansión de Idiomas (i18n)**: Implementado — soporte completo del 100% de los comandos interactivos, errores, metadatos y parsers de particiones en Español e Inglés. Se puede inicializar con el parámetro `--lang en`.
+- ✅ **Ayuda Contextual y Autocompletado**: Implementado — ayuda interactiva categorizada en el comando `help` (o `?`), ayuda específica contextual con `<comando> ?`, autocompletado de opciones y autocompletador inteligente para rutas locales del host.
 
 
 > *Desarrollado para entornos académicos y enseñanza de análisis binario y file systems.*
