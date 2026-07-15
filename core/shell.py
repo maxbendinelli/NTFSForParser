@@ -40,7 +40,7 @@ class NTFSShell(cmd.Cmd):
     def do_partitions(self, arg):
         """Lista las particiones encontradas en el disco."""
         if arg.strip() in ('?', '-h', '--help'):
-            print(self.do_partitions.__doc__)
+            print(_(self.do_partitions.__doc__))
             return
         if not self.mbr_parser.partitions:
             print(_("No se encontraron particiones."))
@@ -218,7 +218,7 @@ class NTFSShell(cmd.Cmd):
     def do_select(self, arg):
         """Selecciona una partición para interactuar con ella. Uso: select <indice>"""
         if arg.strip() in ('?', '-h', '--help'):
-            print(self.do_select.__doc__)
+            print(_(self.do_select.__doc__))
             return
         try:
             idx = int(arg)
@@ -486,7 +486,7 @@ class NTFSShell(cmd.Cmd):
     def do_ls(self, arg):
         """Lista archivos en el directorio actual."""
         if arg.strip() in ('?', '-h', '--help'):
-            print(self.do_ls.__doc__)
+            print(_(self.do_ls.__doc__))
             return
         if self.selected_partition is None or self.current_parser is None:
             print(_("Selecciona una partición primero."))
@@ -556,7 +556,7 @@ class NTFSShell(cmd.Cmd):
     def do_cd(self, arg):
         """Navega a un subdirectorio. Uso: cd <nombre> o cd .."""
         if arg.strip() in ('?', '-h', '--help'):
-            print(self.do_cd.__doc__)
+            print(_(self.do_cd.__doc__))
             return
         if not self.current_parser:
             print(_("Selecciona una partición primero."))
@@ -835,7 +835,7 @@ class NTFSShell(cmd.Cmd):
     def do_cat(self, arg):
         """Muestra el contenido de un archivo, sector o clúster. Uso: cat <id|nombre> o cat sector <num> o cat cluster <num>"""
         if arg.strip() in ('?', '-h', '--help'):
-            print(self.do_cat.__doc__)
+            print(_(self.do_cat.__doc__))
             return
         args = arg.split()
         if not args:
@@ -979,7 +979,7 @@ class NTFSShell(cmd.Cmd):
     def do_extract(self, arg):
         """Extrae el contenido de un archivo a disco. Uso: extract <id> <ruta_destino>"""
         if arg.strip() in ('?', '-h', '--help'):
-            print(self.do_extract.__doc__)
+            print(_(self.do_extract.__doc__))
             return
         args = arg.split()
         if len(args) < 2:
@@ -1133,7 +1133,7 @@ class NTFSShell(cmd.Cmd):
     def do_deleted(self, arg):
         """Lista archivos borrados en la partición activa. Uso: deleted [limite_mft]"""
         if arg.strip() in ('?', '-h', '--help'):
-            print(self.do_deleted.__doc__)
+            print(_(self.do_deleted.__doc__))
             return
         if self.selected_partition is None or self.current_parser is None:
             print(_("Selecciona una partición primero."))
@@ -1204,7 +1204,7 @@ class NTFSShell(cmd.Cmd):
     def do_recover(self, arg):
         """Recupera un archivo borrado reconstruyéndolo a partir de metadatos (FAT/NTFS). Uso: recover <id> <ruta_destino>"""
         if arg.strip() in ('?', '-h', '--help'):
-            print(self.do_recover.__doc__)
+            print(_(self.do_recover.__doc__))
             return
         args = arg.split()
         if len(args) < 2:
@@ -1504,7 +1504,7 @@ class NTFSShell(cmd.Cmd):
         Si no se especifica directorio, se usa el directorio de trabajo actual.
         """
         if arg.strip() in ('?', '-h', '--help'):
-            print(self.do_carve.__doc__)
+            print(_(self.do_carve.__doc__))
             return
         import os
         

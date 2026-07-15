@@ -396,10 +396,29 @@ def verify_all_filesystems():
     assert "COMANDOS GENERALES Y DE NAVEGACIÓN:" in gen_help_output
     print("    [OK] Menú de ayuda general personalizado validado.")
 
+    # ------------------ 12. TEST DE LOCALIZACIÓN DE AYUDA (BILINGÜE) ------------------
+    print("\n[+] 12. Validando Localización de Ayuda (Bilingüe - English)...")
+    from core.i18n import set_language
+    
+    set_language("en")
+    sys.stdout = io.StringIO()
+    try:
+        shell.do_carve("?")
+        en_help_output = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+        set_language("es")
+        
+    print("       Salida de 'carve ?' en inglés:")
+    print("\n".join("         " + line for line in en_help_output.strip().split("\n")[:4]))
+    assert "Performs automated File Carving" in en_help_output
+    assert "Usage:" in en_help_output
+    print("    [OK] Localización de docstrings y ayuda contextual validados correctamente.")
+
     # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO Y AYUDA GENERAL SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL Y TRADUCCIONES SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()
