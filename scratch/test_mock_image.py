@@ -441,15 +441,54 @@ def verify_all_filesystems():
     assert shell_empty.prompt == "Forense > "
     assert len(shell_empty.mbr_parser.partitions) == 6
     
-    # Limpieza del shell_empty
-    shell_empty.data_source.close()
+    # ------------------ 14. TEST DE DETECCIÓN DE BITLOCKER ------------------
+    print("\n[+] 14. Validando Detección de Cifrado BitLocker (Firma -FVE-FS-)...")
     
-    print("    [OK] Inicialización vacía, comandos seguros y comando 'open' validados.")
+    # 14.1 Re-abrir para BitLocker Test
+    shell_empty.do_open("test_disk.raw")
+    
+    # Mockear lectura de sector físico de prueba con firma BitLocker
+    original_read = shell_empty.data_source.read
+    def mock_read_bitlocker(offset, size):
+        if offset == 999999 * 512:
+            buf = bytearray(512)
+            buf[3:11] = b'-FVE-FS-'
+            buf[510:512] = b'\x55\xAA'
+            return bytes(buf)
+        return original_read(offset, size)
+    shell_empty.data_source.read = mock_read_bitlocker
+    
+    # 14.2 Validar identify sector con firma BitLocker
+    sys.stdout = io.StringIO()
+    try:
+        shell_empty.do_identify("sector 999999")
+        identify_bitlocker_out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    print(f"       Salida de identify sector (BitLocker): {identify_bitlocker_out.strip()}")
+    assert "BitLocker" in identify_bitlocker_out
+    
+    # 14.3 Validar select partition con BitLocker VBR
+    shell_empty.mbr_parser.partitions[0].start_lba = 999999
+    sys.stdout = io.StringIO()
+    try:
+        shell_empty.do_select("0")
+        select_bitlocker_out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    print("       Salida de select partition (BitLocker):")
+    print("\n".join("         " + line for line in select_bitlocker_out.strip().split("\n") if line))
+    assert "BitLocker" in select_bitlocker_out
+    assert shell_empty.current_parser is None
+    
+    # Restaurar y limpiar
+    shell_empty.data_source.close()
+    print("    [OK] Detección de BitLocker en identificación y montado de particiones validada.")
 
     # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES Y APERTURA DE IMAGEN SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA Y DETECCIÓN DE BITLOCKER SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()

@@ -301,8 +301,17 @@ class NTFSShell(cmd.Cmd):
             
             detected = False
             
+            # 0. Deteccion BitLocker (Firma -FVE-FS- en offset 3)
+            if len(sect0) >= 11 and sect0[3:11] == b'-FVE-FS-':
+                print(_("    [!] ¡Atención! Esta partición está cifrada con BitLocker (Firma -FVE-FS- detectada)."))
+                print(_("    Los metadatos lógicos están protegidos por cifrado completo de volumen."))
+                print(_("    No se puede parsear de forma lógica, pero puedes realizar carving forense ('carve') o volcar bloques crudos ('sector' / 'hexdump')."))
+                self.current_parser = None
+                self.current_directory_id = None
+                detected = True
+                
             # 1. Deteccion exFAT
-            if len(sect0) >= 11 and sect0[3:11] == b'EXFAT   ':
+            elif len(sect0) >= 11 and sect0[3:11] == b'EXFAT   ':
                 self.current_parser = exFATParser(self.data_source, part)
                 self.current_directory_id = self.current_parser.boot_sector.root_directory_cluster
                 print(_("    Sistema de archivos detectado: exFAT"))
@@ -508,6 +517,9 @@ class NTFSShell(cmd.Cmd):
             if data[510:512] == b'\x55\xAA':
                 if data[3:11] == b'NTFS    ':
                     print("    -> ¡Es un Sector de Arranque (VBR) de NTFS!")
+                    found = True
+                elif data[3:11] == b'-FVE-FS-':
+                    print("    -> ¡Es un Sector de Arranque de BitLocker (Volumen Cifrado)! (Firma -FVE-FS- detectada)")
                     found = True
                 elif data[3:11] == b'MSWIN4.1' or data[3:11] == b'MSDOS5.0':
                     print("    -> ¡Es un Sector de Arranque (VBR) de FAT32/FAT16!")

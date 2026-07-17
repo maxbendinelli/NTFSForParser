@@ -212,5 +212,9 @@
     "No hay ninguna imagen cargada. Usa 'open <ruta_imagen>' primero.": "No image is currently loaded. Use 'open <image_path>' first.",
     "Abre y monta una imagen forense (.dd, .raw, .001, .e01) o disco físico": "Open and mount a forensic image (.dd, .raw, .001, .e01) or physical disk",
     "Uso: open <ruta_imagen>": "Usage: open <image_path>",
-    "\n[!] Error al abrir la imagen forense: {error}": "\n[!] Error opening forensic image: {error}"
+    "\n[!] Error al abrir la imagen forense: {error}": "\n[!] Error opening forensic image: {error}",
+    "    [!] ¡Atención! Esta partición está cifrada con BitLocker (Firma -FVE-FS- detectada).": "    [!] Attention: This partition is encrypted with BitLocker (-FVE-FS- signature detected).",
+    "    Los metadatos lógicos están protegidos por cifrado completo de volumen.": "    Logical metadata is protected by full volume encryption.",
+    "    No se puede parsear de forma lógica, pero puedes realizar carving forense ('carve') o volcar bloques crudos ('sector' / 'hexdump').": "    Logical parsing is unavailable, but you can perform forensic carving ('carve') or dump raw blocks ('sector' / 'hexdump').",
+    "    -> ¡Es un Sector de Arranque de BitLocker (Volumen Cifrado)! (Firma -FVE-FS- detectada)": "    -> BitLocker Boot Sector (Encrypted Volume)! (-FVE-FS- signature detected)"
 }
