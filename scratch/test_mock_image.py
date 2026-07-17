@@ -485,10 +485,32 @@ def verify_all_filesystems():
     shell_empty.data_source.close()
     print("    [OK] Detección de BitLocker en identificación y montado de particiones validada.")
 
+    # ------------------ 15. TEST DE HISTORIAL DE COMANDOS ------------------
+    print("\n[+] 15. Validando Historial de Comandos (Comando 'history')...")
+    shell_history = NTFSShell(None, None)
+    
+    try:
+        import readline
+        readline.add_history("test_command_forense")
+        
+        sys.stdout = io.StringIO()
+        try:
+            shell_history.do_history("")
+            history_output = sys.stdout.getvalue()
+        finally:
+            sys.stdout = old_stdout
+            
+        print("       Salida de history en test:")
+        print("\n".join("         " + line for line in history_output.strip().split("\n") if line))
+        assert "test_command_forense" in history_output
+        print("    [OK] Historial de comandos verificado exitosamente.")
+    except ImportError:
+        print("    [i] Saltando test de readline (no disponible en este entorno).")
+
     # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA Y DETECCIÓN DE BITLOCKER SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER E HISTORIAL SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()

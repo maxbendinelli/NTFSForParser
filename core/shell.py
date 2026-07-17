@@ -23,6 +23,27 @@ class NTFSShell(cmd.Cmd):
         return _("\nBienvenido al Shell Interactivo Forense.\nEscribe 'help' o '?' para listar los comandos.\n")
         
     prompt = "Forense > "
+    
+    HISTORY_FILE = os.path.expanduser("~/.forense_history")
+    MAX_HISTORY_LENGTH = 1000
+
+    def preloop(self):
+        # Cargar historial desde disco
+        if os.path.exists(self.HISTORY_FILE):
+            try:
+                import readline
+                readline.read_history_file(self.HISTORY_FILE)
+            except Exception:
+                pass
+
+    def postloop(self):
+        # Guardar historial al disco
+        try:
+            import readline
+            readline.set_history_length(self.MAX_HISTORY_LENGTH)
+            readline.write_history_file(self.HISTORY_FILE)
+        except Exception:
+            pass
 
     def __init__(self, data_source: DataSource, mbr_parser):
         super().__init__()
@@ -142,6 +163,27 @@ class NTFSShell(cmd.Cmd):
             self.data_source = None
             self.mbr_parser = None
             self.update_prompt()
+
+    def do_history(self, arg):
+        """Muestra el historial de comandos de la sesión actual. Uso: history [límite]"""
+        if arg.strip() in ('?', '-h', '--help'):
+            print(_(self.do_history.__doc__))
+            return
+            
+        try:
+            import readline
+            length = readline.get_current_history_length()
+            limit = int(arg) if arg.strip().isdigit() else None
+            start = 1 if limit is None else max(1, length - limit + 1)
+            
+            print(_("\nHistorial de comandos:"))
+            for i in range(start, length + 1):
+                cmd_str = readline.get_history_item(i)
+                if cmd_str:
+                    print(f"  {i:4d}  {cmd_str}")
+            print("")
+        except ImportError:
+            print(_("El historial detallado no está disponible (falta readline/pyreadline3)."))
 
     def do_imageinfo(self, arg):
         """Muestra los metadatos de la imagen (E01) u otra información general."""
@@ -1814,6 +1856,7 @@ class NTFSShell(cmd.Cmd):
         print(f"  select <idx>     - {_('Selecciona y monta una partición por su índice en la tabla')}")
         print(f"  imageinfo        - {_('Muestra los metadatos de la imagen (sólo E01)')}")
         print(f"  hash_check [alg] - {_('Verifica la integridad de la imagen calculando MD5, SHA1 o SHA256')}")
+        print(f"  history [limit]  - {_('Muestra el historial de comandos ejecutados en el shell')}")
         print(f"  ls               - {_('Lista los archivos y directorios del directorio actual')}")
         print(f"  cd <directorio>  - {_('Navega a un subdirectorio (ej. cd .. o cd carpetaborrada)')}")
         print(f"  cat <id|nombre>  - {_('Muestra el contenido en texto (o hexdump) de un archivo o sector')}")
