@@ -60,12 +60,27 @@ class NTFSShell(cmd.Cmd):
         
         # Ajustar delimitadores de readline para soportar rutas con barras y dos puntos
         try:
-            import readline
+            try:
+                import readline
+            except ImportError:
+                import pyreadline3 as readline
+                import sys
+                sys.modules['readline'] = readline
+                
             delims = readline.get_completer_delims()
             for char in ['/', '\\', ':', '-']:
                 delims = delims.replace(char, '')
             readline.set_completer_delims(delims)
-        except ImportError:
+            
+            # Enlazar explícitamente las flechas arriba/abajo en Windows
+            if sys.platform == "win32":
+                readline.parse_and_bind("up: history-search-backward")
+                readline.parse_and_bind("down: history-search-forward")
+                
+            # Registrar auto-guardado robusto del historial con atexit
+            import atexit
+            atexit.register(readline.write_history_file, self.HISTORY_FILE)
+        except Exception:
             pass
 
     def update_prompt(self):
@@ -207,7 +222,44 @@ class NTFSShell(cmd.Cmd):
             size_gb = size_bytes / (1024**3)
             print(f"  {_('Tamaño total'):<22}: {size_bytes} bytes ({size_gb:.2f} GB)")
         except Exception as e:
+            size_bytes = 0
             print(f"  {_('Tamaño total'):<22}: Error ({e})")
+            
+        # Intentar obtener modelo y número de serie
+        device_model = "N/A (Imagen Cruda)"
+        serial_number = "N/A (Imagen Cruda)"
+        
+        metadata = self.data_source.get_metadata()
+        if metadata:
+            for k, v in metadata.items():
+                k_lower = k.lower()
+                val_str = v.decode('utf-8', errors='replace').strip() if isinstance(v, bytes) else str(v).strip()
+                if "model" in k_lower or "device" in k_lower:
+                    device_model = val_str
+                elif "serial" in k_lower:
+                    serial_number = val_str
+
+        if "PhysicalDrive" in path or path.startswith("\\\\.\\"):
+            device_model = _("Dispositivo de disco físico directo")
+            
+        print(f"  {_('Modelo del dispositivo'):<22}: {device_model}")
+        print(f"  {_('Número de serie'):<22}: {serial_number}")
+        
+        # Calcular geometría de disco CHS
+        if size_bytes > 0:
+            try:
+                total_sectors = size_bytes // 512
+                heads = 255
+                sectors_per_track = 63
+                cylinders = total_sectors // (heads * sectors_per_track)
+                
+                print(_("\n  [+] Geometría lógica del disco (CHS/LBA):"))
+                print(f"    - {_('Total sectores'):<20}: {total_sectors}")
+                print(f"    - {_('Cilindros'):<20}: {cylinders}")
+                print(f"    - {_('Cabezas'):<20}: {heads}")
+                print(f"    - {_('Sectores por pista'):<20}: {sectors_per_track}")
+            except Exception:
+                pass
             
         if hasattr(self.data_source, "get_hash_values"):
             hashes = self.data_source.get_hash_values()
@@ -216,7 +268,6 @@ class NTFSShell(cmd.Cmd):
                 for h_type, h_val in hashes.items():
                     print(f"    - {h_type.upper():<6}: {h_val}")
                     
-        metadata = self.data_source.get_metadata()
         if metadata:
             print(_("\n  [+] Metadatos del Contenedor Forense:"))
             for k, v in metadata.items():

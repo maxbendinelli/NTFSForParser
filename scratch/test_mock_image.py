@@ -523,6 +523,8 @@ def verify_all_filesystems():
     assert "INFORMACIÓN DE LA IMAGEN" in diskinfo_output
     assert "test_disk.raw" in diskinfo_output
     assert "GPT" in diskinfo_output
+    assert "Geometría lógica" in diskinfo_output
+    assert "Cilindros" in diskinfo_output
     print("    [OK] Comando 'diskinfo' verificado exitosamente.")
 
     # Limpieza final

@@ -232,5 +232,13 @@
     "\n  [+] Hashes verificados en contenedor (E01):": "\n  [+] Hashes verified in container (E01):",
     "\n  [+] Metadatos del Contenedor Forense:": "\n  [+] Forensic Container Metadata:",
     "\n  [+] Tabla de particiones detectada: {schema}": "\n  [+] Partition table detected: {schema}",
-    "\n  Particiones disponibles:": "\n  Available partitions:"
+    "\n  Particiones disponibles:": "\n  Available partitions:",
+    "Modelo del dispositivo": "Device model",
+    "Número de serie": "Serial number",
+    "\n  [+] Geometría lógica del disco (CHS/LBA):": "\n  [+] Logical disk geometry (CHS/LBA):",
+    "Total sectores": "Total sectors",
+    "Cilindros": "Cylinders",
+    "Cabezas": "Heads",
+    "Sectors por pista": "Sectors per track",
+    "Dispositivo de disco físico directo": "Direct physical disk device"
 }
