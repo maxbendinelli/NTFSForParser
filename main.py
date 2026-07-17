@@ -21,7 +21,7 @@ for stream in (sys.stdout, sys.stderr):
 
 def main():
     parser = argparse.ArgumentParser(description="NTFSForParser - Framework Educativo Forense")
-    parser.add_argument("image_path", help="Ruta a la imagen (.dd, .001, .e01) o dispositivo físico (\\\\.\\PhysicalDrive0)")
+    parser.add_argument("image_path", nargs="?", default=None, help="Ruta a la imagen (.dd, .001, .e01) o dispositivo físico (\\\\.\\PhysicalDrive0)")
     parser.add_argument("--partitions", action="store_true", help="Lista las particiones encontradas y sale")
     parser.add_argument("--sector", type=int, help="Muestra el volcado del sector físico especificado (LBA absoluto)")
     parser.add_argument("--cluster", type=int, help="Muestra el volcado del clúster lógico especificado (requiere --part)")
@@ -40,6 +40,37 @@ def main():
     
     set_language(args.lang)
     image_path = args.image_path
+
+    # Si no se provee imagen forense
+    if image_path is None:
+        # Si se solicitan comandos CLI que requieren obligatoriamente imagen
+        if (args.partitions or args.sector is not None or args.cluster is not None or
+            args.identify_sector is not None or args.identify_cluster is not None or
+            args.runs is not None or args.dump_clusters is not None or args.carve is not None):
+            print(_("Error: Los comandos por línea de comandos (CLI) requieren especificar una imagen forense."))
+            sys.exit(1)
+            
+        banner = r"""
+    _   __________________  ______          ____                           
+   / | / /_  __/ ____/ __ \/ ____/___  ____/ __ \____ ______________  _____
+  /  |/ / / / / /_  / /_/ / /_  / __ \/ __/ /_/ / __ `/ ___/ ___/ _ \/ ___/
+ / /|  / / / / __/ / _, _/ __/ / /_/ / / / ____/ /_/ / /  (__  )  __/ /    
+/_/ |_/ /_/ /_/   /_/ |_/_/    \____/_/ /_/    \__,_/_/  /____/\___/_/     
+        """
+        print(banner)
+        print("==========================================================================")
+        print("==========================================================================")
+        print(_(" v1.0.0 - Framework Educativo de Informática Forense | Por: Max Bendinelli"))
+        print("==========================================================================")
+        print(_("\n[!] Advertencia: No se ha especificado ninguna imagen forense."))
+        print(_("    Por favor, usa el comando 'open <ruta_imagen>' para cargar una.\n"))
+        
+        shell = NTFSShell(None, None)
+        try:
+            shell.cmdloop()
+        except KeyboardInterrupt:
+            print("\nSaliendo...")
+        return
 
     if not os.path.exists(image_path) and not image_path.startswith(r"\\.\PhysicalDrive"):
         print(_("Error: El archivo {image_path} no existe.").format(image_path=image_path))

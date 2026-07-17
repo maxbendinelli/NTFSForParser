@@ -30,7 +30,9 @@ class NTFSShell(cmd.Cmd):
         self.update_prompt()
 
     def update_prompt(self):
-        if self.selected_partition is None:
+        if self.data_source is None:
+            self.prompt = "Forense [Sin Imagen] > "
+        elif self.selected_partition is None:
             self.prompt = "Forense > "
         else:
             self.prompt = f"Forense [Part {self.selected_partition} | {self.current_path}] > "
@@ -42,8 +44,8 @@ class NTFSShell(cmd.Cmd):
         if arg.strip() in ('?', '-h', '--help'):
             print(_(self.do_partitions.__doc__))
             return
-        if not self.mbr_parser.partitions:
-            print(_("No se encontraron particiones."))
+        if not self.mbr_parser or not self.mbr_parser.partitions:
+            print(_("No se encontraron particiones (Asegúrate de abrir una imagen primero usando 'open')."))
             return
             
         print(_("\nParticiones disponibles:"))
@@ -54,6 +56,65 @@ class NTFSShell(cmd.Cmd):
                 idx=idx, boot=boot, type_name=part.type_name, 
                 start_offset=part.start_offset, size_mb=size_mb))
         print("")
+
+    def do_open(self, arg):
+        """Abre y monta una imagen forense (.dd, .raw, .001, .e01) o disco físico. Uso: open <ruta_imagen>"""
+        if arg.strip() in ('?', '-h', '--help'):
+            print(_(self.do_open.__doc__))
+            return
+            
+        image_path = arg.strip()
+        if not image_path:
+            print(_("Uso: open <ruta_imagen>"))
+            return
+            
+        import os
+        import re
+        from core.data_source import RawImageSource, E01ImageSource, SplitRawImageSource
+        from core.partition_manager import MBRParser
+
+        if not os.path.exists(image_path) and not image_path.startswith(r"\\.\PhysicalDrive"):
+            print(_("Error: El archivo {image_path} no existe.").format(image_path=image_path))
+            return
+
+        try:
+            # Cerrar el DataSource anterior si estuviera abierto
+            if self.data_source:
+                self.data_source.close()
+                self.data_source = None
+                self.mbr_parser = None
+                self.selected_partition = None
+                self.current_parser = None
+                self.current_path = "/"
+                self.fat_files_cache = []
+                self.ntfs_files_cache = {}
+                self.ext4_files_cache = []
+
+            print(_("\n[+] Cargando fuente de datos: {image_path}").format(image_path=image_path))
+            if re.search(r'\.[0-9]{3}$', image_path.lower()):
+                data_source = SplitRawImageSource(image_path)
+            elif image_path.lower().endswith('.e01'):
+                data_source = E01ImageSource(image_path)
+            else:
+                data_source = RawImageSource(image_path)
+
+            self.data_source = data_source
+            self.mbr_parser = MBRParser(data_source)
+            
+            print(_("    Tamaño total: {size:.2f} GB").format(size=data_source.get_size() / (1024**3)))
+            print(_("    Se encontraron {count} particiones.").format(count=len(self.mbr_parser.partitions)))
+            self.update_prompt()
+            
+            # Listar particiones automáticamente
+            self.do_partitions("")
+            
+        except PermissionError:
+            print(_("\n[!] Error de permisos: Si intentas abrir un disco físico, asegúrate de ejecutar el script como Administrador."))
+        except Exception as e:
+            print(_("\n[!] Error al abrir la imagen forense: {error}").format(error=e))
+            self.data_source = None
+            self.mbr_parser = None
+            self.update_prompt()
 
     def do_imageinfo(self, arg):
         """Muestra los metadatos de la imagen (E01) u otra información general."""
@@ -220,6 +281,9 @@ class NTFSShell(cmd.Cmd):
         if arg.strip() in ('?', '-h', '--help'):
             print(_(self.do_select.__doc__))
             return
+        if not self.mbr_parser:
+            print(_("No hay ninguna imagen cargada. Usa 'open <ruta_imagen>' primero."))
+            return
         try:
             idx = int(arg)
             if idx < 0 or idx >= len(self.mbr_parser.partitions):
@@ -306,6 +370,9 @@ class NTFSShell(cmd.Cmd):
 
     def do_hexdump(self, arg):
         """Muestra un volcado hexadecimal absoluto. Uso: hexdump <offset> <longitud>"""
+        if not self.data_source:
+            print(_("No hay ninguna imagen cargada. Usa 'open <ruta_imagen>' primero."))
+            return
         args = arg.split()
         if len(args) < 1:
             print("Uso: hexdump <offset_absoluto> [longitud]")
@@ -323,6 +390,9 @@ class NTFSShell(cmd.Cmd):
 
     def do_sector(self, arg):
         """Muestra un sector físico del disco (LBA). Uso: sector <lba>"""
+        if not self.data_source:
+            print(_("No hay ninguna imagen cargada. Usa 'open <ruta_imagen>' primero."))
+            return
         try:
             lba = int(arg, 0)
             offset = lba * 512 # Asumiendo 512 bytes físicos
@@ -397,6 +467,9 @@ class NTFSShell(cmd.Cmd):
             
     def do_identify(self, arg):
         """Analiza un sector o clúster para identificar mágicamente qué tipo de dato contiene. Uso: identify sector <num> o identify cluster <num>"""
+        if not self.data_source:
+            print(_("No hay ninguna imagen cargada. Usa 'open <ruta_imagen>' primero."))
+            return
         args = arg.split()
         if len(args) != 2:
             print("Uso: identify sector <num>  o  identify cluster <num>")
@@ -1697,6 +1770,7 @@ class NTFSShell(cmd.Cmd):
         print(_("=================================================================================="))
         
         print(_("\n[+] COMANDOS GENERALES Y DE NAVEGACIÓN:"))
+        print(f"  open <imagen>    - {_('Abre y monta una imagen forense (.dd, .raw, .001, .e01) o disco físico')}")
         print(f"  partitions       - {_('Lista las particiones físicas detectadas en el disco')}")
         print(f"  select <idx>     - {_('Selecciona y monta una partición por su índice en la tabla')}")
         print(f"  imageinfo        - {_('Muestra los metadatos de la imagen (sólo E01)')}")
@@ -1840,6 +1914,11 @@ class NTFSShell(cmd.Cmd):
             return [o for o in options if o.startswith(text)]
 
         # En otro caso, autocompletar rutas locales en el host
+        return self._complete_local_path(text)
+
+    def complete_open(self, text, line, begidx, endidx):
+        if text == '?':
+            return ['?']
         return self._complete_local_path(text)
 
     # Atajos
