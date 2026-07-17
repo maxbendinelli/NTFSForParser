@@ -1,5 +1,13 @@
 import cmd
 import sys
+import os
+
+# Ajustar sys.path para permitir la ejecución directa de este script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
 from core.i18n import _
 from core.data_source import DataSource
 from core.utils import hexdump, print_breakdown
@@ -1936,3 +1944,20 @@ class NTFSShell(cmd.Cmd):
     # Atajos
     do_q = do_quit
     do_EOF = do_exit
+
+if __name__ == "__main__":
+    import struct
+    # Carga de internacionalización básica
+    from core.i18n import set_language
+    set_language("es")
+    
+    # Inicialización del shell en vacío
+    print("\n[+] Iniciando el Shell Interactivo Forense...")
+    print("[!] Advertencia: No se ha especificado ninguna imagen forense.")
+    print("    Por favor, usa el comando 'open <ruta_imagen>' para cargar una.\n")
+    
+    shell = NTFSShell(None, None)
+    try:
+        shell.cmdloop()
+    except KeyboardInterrupt:
+        print("\nSaliendo...")
