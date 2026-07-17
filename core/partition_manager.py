@@ -46,6 +46,7 @@ class MBRParser:
         self.data_source = data_source
         self.sector_size = sector_size
         self.partitions = []
+        self.is_gpt = False
         self._parse()
 
     def _parse(self):
@@ -99,6 +100,7 @@ class MBRParser:
         # Detección de GPT (GUID Partition Table)
         if len(self.partitions) > 0 and self.partitions[0].type_code == 0xEE:
             print(_("\n[+] Detectado Protective MBR (0xEE). Saltando al LBA 1 para parsear GPT..."))
+            self.is_gpt = True
             self.partitions.clear()
             self._parse_gpt()
 

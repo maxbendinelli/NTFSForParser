@@ -222,5 +222,15 @@
     "Muestra el historial de comandos de la sesión actual. Uso: history [límite]": "Show command history of the current session. Usage: history [limit]",
     "Muestra el historial de comandos ejecutados en el shell": "Show the history of commands executed in the shell",
     "\nHistorial de comandos:": "\nCommand history:",
-    "El historial detallado no está disponible (falta readline/pyreadline3).": "Detailed history is unavailable (missing readline/pyreadline3)."
+    "El historial detallado no está disponible (falta readline/pyreadline3).": "Detailed history is unavailable (missing readline/pyreadline3).",
+    "Muestra información técnica consolidada del disco e imagen cargada. Uso: diskinfo": "Show consolidated technical information of the loaded disk and image. Usage: diskinfo",
+    "Muestra información técnica consolidada del disco o imagen": "Show consolidated technical info of the disk or image",
+    "\n==================================================================================": "\n==================================================================================",
+    "  INFORMACIÓN DE LA IMAGEN DE DISCO / DISPOSITIVO": "  DISK IMAGE / DEVICE INFORMATION",
+    "Origen de datos": "Data source",
+    "Tamaño total": "Total size",
+    "\n  [+] Hashes verificados en contenedor (E01):": "\n  [+] Hashes verified in container (E01):",
+    "\n  [+] Metadatos del Contenedor Forense:": "\n  [+] Forensic Container Metadata:",
+    "\n  [+] Tabla de particiones detectada: {schema}": "\n  [+] Partition table detected: {schema}",
+    "\n  Particiones disponibles:": "\n  Available partitions:"
 }

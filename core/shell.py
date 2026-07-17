@@ -185,6 +185,63 @@ class NTFSShell(cmd.Cmd):
         except ImportError:
             print(_("El historial detallado no está disponible (falta readline/pyreadline3)."))
 
+    def do_diskinfo(self, arg):
+        """Muestra información técnica consolidada del disco e imagen cargada. Uso: diskinfo"""
+        if arg.strip() in ('?', '-h', '--help'):
+            print(_(self.do_diskinfo.__doc__))
+            return
+            
+        if not self.data_source:
+            print(_("No hay ninguna imagen cargada. Usa 'open <ruta_imagen>' primero."))
+            return
+            
+        print(_("\n=================================================================================="))
+        print(_("  INFORMACIÓN DE LA IMAGEN DE DISCO / DISPOSITIVO"))
+        print(_("=================================================================================="))
+        
+        path = getattr(self.data_source, "file_path", "Dispositivo Físico / Memoria")
+        print(f"  {_('Origen de datos'):<22}: {path}")
+        
+        try:
+            size_bytes = self.data_source.get_size()
+            size_gb = size_bytes / (1024**3)
+            print(f"  {_('Tamaño total'):<22}: {size_bytes} bytes ({size_gb:.2f} GB)")
+        except Exception as e:
+            print(f"  {_('Tamaño total'):<22}: Error ({e})")
+            
+        if hasattr(self.data_source, "get_hash_values"):
+            hashes = self.data_source.get_hash_values()
+            if hashes:
+                print(_("\n  [+] Hashes verificados en contenedor (E01):"))
+                for h_type, h_val in hashes.items():
+                    print(f"    - {h_type.upper():<6}: {h_val}")
+                    
+        metadata = self.data_source.get_metadata()
+        if metadata:
+            print(_("\n  [+] Metadatos del Contenedor Forense:"))
+            for k, v in metadata.items():
+                val_str = v.decode('utf-8', errors='replace') if isinstance(v, bytes) else str(v)
+                print(f"    - {k:<20}: {val_str}")
+                
+        if self.mbr_parser:
+            schema_type = "GPT" if self.mbr_parser.is_gpt else "MBR"
+            print(_("\n  [+] Tabla de particiones detectada: {schema}").format(schema=schema_type))
+            
+            partitions = self.mbr_parser.partitions
+            if partitions:
+                print(_("\n  Particiones disponibles:"))
+                print(f"    {'Idx':<5} | {'Nombre / Tipo':<45} | {'Offset LBA':<12} | {'Tamaño':<10}")
+                print("    " + "-" * 80)
+                for idx, part in enumerate(partitions):
+                    name_type = part.type_name if part.type_name else f"Tipo MBR: {hex(part.type_code)}"
+                    size_mb = part.size_in_bytes / (1024**2)
+                    size_str = f"{size_mb:.1f} MB" if size_mb < 1024 else f"{size_mb/1024:.2f} GB"
+                    print(f"    [{idx}]  | {name_type:<45} | {part.start_lba:<12} | {size_str:<10}")
+            else:
+                print(_("\n  [!] No se encontraron particiones válidas en la tabla."))
+                
+        print("==================================================================================\n")
+
     def do_imageinfo(self, arg):
         """Muestra los metadatos de la imagen (E01) u otra información general."""
         metadata = self.data_source.get_metadata()
@@ -1867,6 +1924,7 @@ class NTFSShell(cmd.Cmd):
         print(f"  partitions       - {_('Lista las particiones físicas detectadas en el disco')}")
         print(f"  select <idx>     - {_('Selecciona y monta una partición por su índice en la tabla')}")
         print(f"  imageinfo        - {_('Muestra los metadatos de la imagen (sólo E01)')}")
+        print(f"  diskinfo         - {_('Muestra información técnica consolidada del disco o imagen')}")
         print(f"  hash_check [alg] - {_('Verifica la integridad de la imagen calculando MD5, SHA1 o SHA256')}")
         print(f"  history [limit]  - {_('Muestra el historial de comandos ejecutados en el shell')}")
         print(f"  ls               - {_('Lista los archivos y directorios del directorio actual')}")

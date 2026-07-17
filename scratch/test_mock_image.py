@@ -507,10 +507,28 @@ def verify_all_filesystems():
     except ImportError:
         print("    [i] Saltando test de readline (no disponible en este entorno).")
 
+    # ------------------ 16. TEST DE DISKINFO ------------------
+    print("\n[+] 16. Validando Comando 'diskinfo' (Reporte Maestro de Disco)...")
+    shell_diskinfo = NTFSShell(source, MBRParser(source))
+    
+    sys.stdout = io.StringIO()
+    try:
+        shell_diskinfo.do_diskinfo("")
+        diskinfo_output = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+        
+    print("       Salida de diskinfo en test:")
+    print("\n".join("         " + line for line in diskinfo_output.strip().split("\n") if line))
+    assert "INFORMACIÓN DE LA IMAGEN" in diskinfo_output
+    assert "test_disk.raw" in diskinfo_output
+    assert "GPT" in diskinfo_output
+    print("    [OK] Comando 'diskinfo' verificado exitosamente.")
+
     # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER E HISTORIAL SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER, HISTORIAL Y DISKINFO SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()
