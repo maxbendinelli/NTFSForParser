@@ -1951,9 +1951,20 @@ if __name__ == "__main__":
     from core.i18n import set_language
     set_language("es")
     
-    # Inicialización del shell en vacío
-    print("\n[+] Iniciando el Shell Interactivo Forense...")
-    print("[!] Advertencia: No se ha especificado ninguna imagen forense.")
+    # Inicialización del shell con banner oficial
+    banner = r"""
+    _   __________________  ______          ____                           
+   / | / /_  __/ ____/ __ \/ ____/___  ____/ __ \____ ______________  _____
+  /  |/ / / / / /_  / /_/ / /_  / __ \/ __/ /_/ / __ `/ ___/ ___/ _ \/ ___/
+ / /|  / / / / __/ / _, _/ __/ / /_/ / / / ____/ /_/ / /  (__  )  __/ /    
+/_/ |_/ /_/ /_/   /_/ |_/_/    \____/_/ /_/    \__,_/_/  /____/\___/_/     
+    """
+    print(banner)
+    print("==========================================================================")
+    print("==========================================================================")
+    print(" v1.0.0 - Framework Educativo de Informática Forense | Por: Max Bendinelli")
+    print("==========================================================================")
+    print("\n[!] Advertencia: No se ha especificado ninguna imagen forense.")
     print("    Por favor, usa el comando 'open <ruta_imagen>' para cargar una.\n")
     
     shell = NTFSShell(None, None)
