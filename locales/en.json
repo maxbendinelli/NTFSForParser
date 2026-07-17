@@ -259,5 +259,17 @@
     "Inactiva": "Inactive",
     "Sector de inicio físico en disco": "Physical starting sector on disk",
     "Error al leer el GPT Header.": "Error reading GPT Header.",
-    "Error al leer el MBR.": "Error reading MBR."
+    "Error al leer el MBR.": "Error reading MBR.",
+    "Muestra el sector de arranque del volumen (VBR) en hexadecimal y colores didácticos.\n        Uso: vbrinfo\n        ": "Show the volume boot record (VBR) in hexadecimal with educational color coding.\n        Usage: vbrinfo\n        ",
+    "No hay ninguna partición seleccionada. Usa 'select <id_particion>' primero.": "No partition selected. Use 'select <partition_id>' first.",
+    "Error al leer el VBR de la partición: {error}": "Error reading partition VBR: {error}",
+    "Error: No se pudieron leer 512 bytes del VBR.": "Error: Could not read 512 bytes from VBR.",
+    "\n==================================================================================": "\n==================================================================================",
+    "  ANÁLISIS EXPLICATIVO DEL SECTOR DE ARRANQUE DEL VOLUMEN (VBR) - {fs}": "  EXPLANATORY ANALYSIS OF THE VOLUME BOOT RECORD (VBR) - {fs}",
+    "\n[i] Volcado hexadecimal de los primeros 96 bytes del VBR:": "\n[i] Hexadecimal dump of the first 96 bytes of the VBR:",
+    "\n[+] Desglose del BIOS Parameter Block (BPB):": "\n[+] BIOS Parameter Block (BPB) Breakdown:",
+    "Tamaño volumen": "Volume size",
+    "Apunta al inicio físico de la Master File Table": "Points to the physical start of the Master File Table",
+    "Firma de arranque de sector válida (0x55AA).": "Valid boot sector signature (0x55AA).",
+    "Firma de arranque de sector válida (0x55AA).": "Valid boot sector signature (0x55AA)."
 }

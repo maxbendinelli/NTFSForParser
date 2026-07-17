@@ -553,10 +553,49 @@ def verify_all_filesystems():
     assert "GPT Header" in parts_verbose_out
     print("    [OK] Desglose didáctico y espacio sin particionar validados correctamente.")
 
+    # ------------------ 18. TEST DE VBRINFO (VOLÚMENES Y FILESYSTEMS) ------------------
+    print("\n[+] 18. Validando Comando 'vbrinfo' (Estructura de Filesystems)...")
+    shell_vbr = NTFSShell(source, MBRParser(source))
+    
+    sys.stdout = io.StringIO()
+    try:
+        shell_vbr.do_vbrinfo("")
+        vbr_no_sel_out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    assert "No hay ninguna partición seleccionada" in vbr_no_sel_out
+    
+    shell_vbr.do_select("2")
+    sys.stdout = io.StringIO()
+    try:
+        shell_vbr.do_vbrinfo("")
+        vbr_fat32_out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    print("       Salida de vbrinfo para FAT32 en test:")
+    print("\n".join("         " + line for line in vbr_fat32_out.strip().split("\n")[:25] if line))
+    assert "ANÁLISIS EXPLICATIVO" in vbr_fat32_out
+    assert "BIOS Parameter Block" in vbr_fat32_out
+    assert "Sectores Reservados" in vbr_fat32_out
+    
+    shell_vbr.do_select("4")
+    sys.stdout = io.StringIO()
+    try:
+        shell_vbr.do_vbrinfo("")
+        vbr_ntfs_out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    print("       Salida de vbrinfo para NTFS en test:")
+    print("\n".join("         " + line for line in vbr_ntfs_out.strip().split("\n")[:25] if line))
+    assert "ANÁLISIS EXPLICATIVO" in vbr_ntfs_out
+    assert "Clúster de inicio $MFT" in vbr_ntfs_out or "Apunta al inicio físico" in vbr_ntfs_out
+    
+    print("    [OK] Desglose didáctico de VBR de volúmenes validado correctamente.")
+
     # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER, HISTORIAL, DISKINFO Y PARTITIONS EXPLICATIVO SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER, HISTORIAL, DISKINFO, PARTITIONS EXPLICATIVO Y VBRINFO SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()

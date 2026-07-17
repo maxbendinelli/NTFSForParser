@@ -309,6 +309,216 @@ class NTFSShell(cmd.Cmd):
                 print(f"    - Bytes 12-15(Sectores) : \033[1m{num_sectors}\033[0m -> {_('Tamaño')}: {num_sectors * 512 / (1024**2):.2f} MB")
             print("==================================================================================\n")
 
+    def do_vbrinfo(self, arg):
+        """Muestra el sector de arranque del volumen (VBR) en hexadecimal y colores didácticos.
+        Uso: vbrinfo
+        """
+        if arg.strip() in ('?', '-h', '--help'):
+            print(_(self.do_vbrinfo.__doc__))
+            return
+            
+        if not self.data_source:
+            print(_("No hay ninguna imagen cargada. Usa 'open <ruta_imagen>' primero."))
+            return
+            
+        if self.selected_partition is None:
+            print(_("No hay ninguna partición seleccionada. Usa 'select <id_particion>' primero."))
+            return
+            
+        import struct
+        part = self.mbr_parser.partitions[self.selected_partition]
+        
+        try:
+            vbr_data = self.data_source.read(part.start_offset, 512)
+        except Exception as e:
+            print(_("Error al leer el VBR de la partición: {error}").format(error=e))
+            return
+            
+        if len(vbr_data) < 512:
+            print(_("Error: No se pudieron leer 512 bytes del VBR."))
+            return
+            
+        # Detectar tipo de sistema de archivos
+        fs_type = "DESCONOCIDO"
+        if b"NTFS" in vbr_data[3:11]:
+            fs_type = "NTFS"
+        elif b"EXFAT" in vbr_data[3:11]:
+            fs_type = "EXFAT"
+        elif vbr_data[510:512] == b"\x55\xaa":
+            if b"FAT32" in vbr_data[82:90] or b"FAT32" in vbr_data[54:62]:
+                fs_type = "FAT32"
+            elif b"FAT16" in vbr_data[54:62] or b"FAT12" in vbr_data[54:62]:
+                fs_type = "FAT16/12"
+            else:
+                sectors_per_fat_16 = struct.unpack('<H', vbr_data[22:24])[0]
+                if sectors_per_fat_16 == 0:
+                    fs_type = "FAT32"
+                else:
+                    fs_type = "FAT16/12"
+                    
+        print(_("\n=================================================================================="))
+        print(_("  ANÁLISIS EXPLICATIVO DEL SECTOR DE ARRANQUE DEL VOLUMEN (VBR) - {fs}").format(fs=fs_type))
+        print(_("=================================================================================="))
+        
+        print(_("\n[i] Volcado hexadecimal de los primeros 96 bytes del VBR:"))
+        print("Offset    | Hexadecimal                                     | ASCII")
+        print("-" * 75)
+        
+        for i in range(0, 96, 16):
+            chunk = vbr_data[i:i+16]
+            hex_str = ""
+            ascii_str = ""
+            for j, b in enumerate(chunk):
+                offset = i + j
+                color = "\033[90m" # Gris por defecto
+                
+                if fs_type == "NTFS":
+                    if 0 <= offset < 3:
+                        color = "\033[92m"
+                    elif 3 <= offset < 11:
+                        color = "\033[93m"
+                    elif 11 <= offset < 13:
+                        color = "\033[96m"
+                    elif offset == 13:
+                        color = "\033[95m"
+                    elif 40 <= offset < 48:
+                        color = "\033[94m"
+                    elif 48 <= offset < 56:
+                        color = "\033[92;1m"
+                elif fs_type == "EXFAT":
+                    if 0 <= offset < 3:
+                        color = "\033[92m"
+                    elif 3 <= offset < 11:
+                        color = "\033[93m"
+                    elif 64 <= offset < 72:
+                        color = "\033[96m"
+                    elif 72 <= offset < 80:
+                        color = "\033[95m"
+                    elif 80 <= offset < 84:
+                        color = "\033[94m"
+                elif fs_type == "FAT32":
+                    if 0 <= offset < 3:
+                        color = "\033[92m"
+                    elif 3 <= offset < 11:
+                        color = "\033[93m"
+                    elif 11 <= offset < 13:
+                        color = "\033[96m"
+                    elif offset == 13:
+                        color = "\033[95m"
+                    elif 14 <= offset < 16:
+                        color = "\033[94m"
+                    elif offset == 16:
+                        color = "\033[92;1m"
+                    elif 32 <= offset < 36:
+                        color = "\033[96;1m"
+                    elif 36 <= offset < 40:
+                        color = "\033[93;1m"
+                    elif 44 <= offset < 48:
+                        color = "\033[95;1m"
+                else: # FAT16 / FAT12
+                    if 0 <= offset < 3:
+                        color = "\033[92m"
+                    elif 3 <= offset < 11:
+                        color = "\033[93m"
+                    elif 11 <= offset < 13:
+                        color = "\033[96m"
+                    elif offset == 13:
+                        color = "\033[95m"
+                    elif 14 <= offset < 16:
+                        color = "\033[94m"
+                    elif offset == 16:
+                        color = "\033[92;1m"
+                    elif 17 <= offset < 19:
+                        color = "\033[96;1m"
+                    elif 22 <= offset < 24:
+                        color = "\033[93;1m"
+                        
+                hex_str += f"{color}{b:02x}\033[0m "
+                ascii_str += f"{color}{chr(b) if 32 <= b <= 127 else '.'}\033[0m"
+            print(f"0x{i:02x}       | {hex_str} | {ascii_str}")
+            
+        print("...")
+        sig_color = "\033[91m" if vbr_data[510:512] == b"\x55\xaa" else "\033[90m"
+        print(f"0x1fe      | {' '*39} {sig_color}{vbr_data[510]:02x}\033[0m {sig_color}{vbr_data[511]:02x}\033[0m | ..")
+        
+        print(_("\n[+] Desglose del BIOS Parameter Block (BPB):"))
+        if fs_type == "NTFS":
+            jump = vbr_data[0:3].hex().upper()
+            oem = vbr_data[3:11].decode('ascii', errors='ignore')
+            bps = struct.unpack('<H', vbr_data[11:13])[0]
+            spc = vbr_data[13]
+            total_sectors = struct.unpack('<Q', vbr_data[40:48])[0]
+            mft_lcn = struct.unpack('<Q', vbr_data[48:56])[0]
+            
+            print(f"  - Offset 0x00 (Instrucción de Salto): \033[92m{jump}\033[0m -> Jump boot code.")
+            print(f"  - Offset 0x03 (OEM ID)              : \033[93m{oem}\033[0m")
+            print(f"  - Offset 0x0b (Bytes por Sector)    : \033[96m{bps}\033[0m")
+            print(f"  - Offset 0x0d (Sectores por Clúster): \033[95m{spc}\033[0m")
+            print(f"  - Offset 0x28 (Sectores Totales)    : \033[94m{total_sectors}\033[0m -> {_('Tamaño volumen')}: {total_sectors * bps / (1024**2):.2f} MB")
+            print(f"  - Offset 0x30 (Clúster de inicio $MFT): \033[92;1m{mft_lcn}\033[0m -> {_('Apunta al inicio físico de la Master File Table')}")
+            
+        elif fs_type == "EXFAT":
+            jump = vbr_data[0:3].hex().upper()
+            oem = vbr_data[3:11].decode('ascii', errors='ignore')
+            part_offset = struct.unpack('<Q', vbr_data[64:72])[0]
+            vol_len = struct.unpack('<Q', vbr_data[72:80])[0]
+            fat_offset = struct.unpack('<I', vbr_data[80:84])[0]
+            bps_exp = vbr_data[108]
+            spc_exp = vbr_data[109]
+            bps = 2**bps_exp
+            spc = 2**spc_exp
+            
+            print(f"  - Offset 0x00 (Instrucción de Salto): \033[92m{jump}\033[0m")
+            print(f"  - Offset 0x03 (OEM ID)              : \033[93m{oem}\033[0m")
+            print(f"  - Offset 0x40 (Desplazamiento Part.) : \033[96m{part_offset}\033[0m -> LBA absoluto de inicio.")
+            print(f"  - Offset 0x48 (Sectores Totales)    : \033[95m{vol_len}\033[0m -> {_('Tamaño')}: {vol_len * bps / (1024**2):.2f} MB")
+            print(f"  - Offset 0x50 (Offset de la FAT)    : \033[94m{fat_offset}\033[0m -> LBA relativo de inicio de la tabla FAT.")
+            print(f"  - Offset 0x6c (Bytes por Sector Exp): \033[92;1m2^{bps_exp}\033[0m -> {bps} bytes.")
+            print(f"  - Offset 0x6d (Clúster Exp)         : \033[96;1m2^{spc_exp}\033[0m -> {spc} sectores por clúster.")
+            
+        elif fs_type == "FAT32":
+            jump = vbr_data[0:3].hex().upper()
+            oem = vbr_data[3:11].decode('ascii', errors='ignore')
+            bps = struct.unpack('<H', vbr_data[11:13])[0]
+            spc = vbr_data[13]
+            res_sectors = struct.unpack('<H', vbr_data[14:16])[0]
+            num_fats = vbr_data[16]
+            tot_sectors = struct.unpack('<I', vbr_data[32:36])[0]
+            sectors_per_fat = struct.unpack('<I', vbr_data[36:40])[0]
+            root_cluster = struct.unpack('<I', vbr_data[44:48])[0]
+            
+            print(f"  - Offset 0x00 (Instrucción de Salto): \033[92m{jump}\033[0m")
+            print(f"  - Offset 0x03 (OEM ID)              : \033[93m{oem}\033[0m")
+            print(f"  - Offset 0x0b (Bytes por Sector)    : \033[96m{bps}\033[0m")
+            print(f"  - Offset 0x0d (Sectores por Clúster): \033[95m{spc}\033[0m")
+            print(f"  - Offset 0x0e (Sectores Reservados) : \033[94m{res_sectors}\033[0m -> LBA relativo al inicio de la FAT.")
+            print(f"  - Offset 0x10 (Número de FATs)      : \033[92;1m{num_fats}\033[0m")
+            print(f"  - Offset 0x20 (Sectores Totales)    : \033[96;1m{tot_sectors}\033[0m -> {_('Tamaño')}: {tot_sectors * bps / (1024**2):.2f} MB")
+            print(f"  - Offset 0x24 (Sectores por FAT)    : \033[93;1m{sectors_per_fat}\033[0m -> Tamaño de la tabla FAT.")
+            print(f"  - Offset 0x2c (Clúster raíz)        : \033[95;1m{root_cluster}\033[0m -> Clúster donde se encuentra el directorio raíz.")
+            
+        else: # FAT16 / FAT12
+            jump = vbr_data[0:3].hex().upper()
+            oem = vbr_data[3:11].decode('ascii', errors='ignore')
+            bps = struct.unpack('<H', vbr_data[11:13])[0]
+            spc = vbr_data[13]
+            res_sectors = struct.unpack('<H', vbr_data[14:16])[0]
+            num_fats = vbr_data[16]
+            root_entries = struct.unpack('<H', vbr_data[17:19])[0]
+            sectors_per_fat = struct.unpack('<H', vbr_data[22:24])[0]
+            
+            print(f"  - Offset 0x00 (Instrucción de Salto): \033[92m{jump}\033[0m")
+            print(f"  - Offset 0x03 (OEM ID)              : \033[93m{oem}\033[0m")
+            print(f"  - Offset 0x0b (Bytes por Sector)    : \033[96m{bps}\033[0m")
+            print(f"  - Offset 0x0d (Sectores por Clúster): \033[95m{spc}\033[0m")
+            print(f"  - Offset 0x0e (Sectores Reservados) : \033[94m{res_sectors}\033[0m")
+            print(f"  - Offset 0x10 (Número de FATs)      : \033[92;1m{num_fats}\033[0m")
+            print(f"  - Offset 0x11 (Entradas Directorio) : \033[96;1m{root_entries}\033[0m -> Capacidad máxima del directorio raíz fijo.")
+            print(f"  - Offset 0x16 (Sectores por FAT)    : \033[93;1m{sectors_per_fat}\033[0m")
+            
+        print(f"\n  - Offset 0x1fe (Firma de Sector)    : {sig_color}{vbr_data[510:512].hex().upper()}\033[0m -> {_('Firma de arranque de sector válida (0x55AA).') if vbr_data[510:512] == b'\\x55\\xaa' else _('Firma de arranque inválida.')}")
+        print("==================================================================================\n")
+
     def do_open(self, arg):
         """Abre y monta una imagen forense (.dd, .raw, .001, .e01) o disco físico. Uso: open <ruta_imagen>"""
         if arg.strip() in ('?', '-h', '--help'):
