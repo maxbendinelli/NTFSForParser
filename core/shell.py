@@ -195,47 +195,52 @@ class NTFSShell(cmd.Cmd):
             print(f"  - Offset 0x50 (Num Entradas): \033[96m{num_entries}\033[0m -> Cantidad máxima de particiones soportadas.")
             print(f"  - Offset 0x54 (Tamaño Ent.):  \033[95m{entry_size}\033[0m -> Tamaño en bytes de cada registro de partición.")
             
-            # Leer la primera entrada GPT en LBA 2
-            gpt_entry_data = self.data_source.read(entries_lba * 512, 128)
-            if len(gpt_entry_data) >= 128:
-                print(_("\n[i] Volcado hexadecimal de la Primera Entrada GPT (LBA 2, 128 bytes):"))
-                print("Offset    | Hexadecimal                                     | ASCII")
-                print("-" * 75)
+            # Recorrer todas las particiones analizadas de forma activa
+            for idx, part in enumerate(self.mbr_parser.partitions):
+                entry_offset = (entries_lba * 512) + (idx * entry_size)
+                gpt_entry_data = self.data_source.read(entry_offset, entry_size)
                 
-                for i in range(0, 128, 16):
-                    chunk = gpt_entry_data[i:i+16]
-                    hex_str = ""
-                    ascii_str = ""
-                    for j, b in enumerate(chunk):
-                        offset = i + j
-                        if 0 <= offset < 16: # GUID de Tipo
-                            color = "\033[92m"
-                        elif 16 <= offset < 32: # GUID de Partición
-                            color = "\033[90m"
-                        elif 32 <= offset < 40: # Primer LBA
-                            color = "\033[93m"
-                        elif 40 <= offset < 48: # Último LBA
-                            color = "\033[96m"
-                        elif 56 <= offset < 128: # Nombre UTF-16LE
-                            color = "\033[95m"
-                        else:
-                            color = "\033[0m"
-                        hex_str += f"{color}{b:02x}\033[0m "
-                        ascii_str += f"{color}{chr(b) if 32 <= b <= 127 else '.'}\033[0m"
-                    print(f"0x{i:02x}       | {hex_str} | {ascii_str}")
+                if len(gpt_entry_data) >= 128:
+                    print(f"\n" + "-" * 75)
+                    print(_("[i] Volcado hexadecimal de la Entrada GPT #{idx} (LBA {lba}, Offset {offset}):").format(
+                        idx=idx, lba=entries_lba + (idx * entry_size) // 512, offset=hex(entry_offset)))
+                    print("Offset    | Hexadecimal                                     | ASCII")
+                    print("-" * 75)
                     
-                import uuid
-                type_guid = uuid.UUID(bytes_le=gpt_entry_data[0:16])
-                first_lba, last_lba = struct.unpack('<QQ', gpt_entry_data[32:48])
-                part_name = gpt_entry_data[56:128].decode('utf-16le', errors='replace').rstrip('\x00')
-                num_sectors = (last_lba - first_lba) + 1
-                
-                print(_("\n[+] Desglose de la Primera Entrada GPT (LBA 2):"))
-                print(f"  - Offset 0x00 (GUID Tipo)  : \033[92m{type_guid}\033[0m -> Tipo de partición.")
-                print(f"  - Offset 0x20 (Primer LBA)  : \033[93m{first_lba}\033[0m -> Sector físico de inicio.")
-                print(f"  - Offset 0x28 (Último LBA)  : \033[96m{last_lba}\033[0m -> Sector físico de fin.")
-                print(f"  - Offset 0x38 (Nombre Part) : \033[95m{part_name}\033[0m -> Etiqueta de la partición (Unicode UTF-16LE).")
-                print(f"  - Tamaño Calculado         : {num_sectors} sectores ({num_sectors * 512 / (1024**2):.2f} MB)")
+                    for i in range(0, 128, 16):
+                        chunk = gpt_entry_data[i:i+16]
+                        hex_str = ""
+                        ascii_str = ""
+                        for j, b in enumerate(chunk):
+                            offset = i + j
+                            if 0 <= offset < 16: # GUID de Tipo
+                                color = "\033[92m"
+                            elif 16 <= offset < 32: # GUID de Partición
+                                color = "\033[90m"
+                            elif 32 <= offset < 40: # Primer LBA
+                                color = "\033[93m"
+                            elif 40 <= offset < 48: # Último LBA
+                                color = "\033[96m"
+                            elif 56 <= offset < 128: # Nombre UTF-16LE
+                                color = "\033[95m"
+                            else:
+                                color = "\033[0m"
+                            hex_str += f"{color}{b:02x}\033[0m "
+                            ascii_str += f"{color}{chr(b) if 32 <= b <= 127 else '.'}\033[0m"
+                        print(f"0x{i:02x}       | {hex_str} | {ascii_str}")
+                        
+                    import uuid
+                    type_guid = uuid.UUID(bytes_le=gpt_entry_data[0:16])
+                    first_lba, last_lba = struct.unpack('<QQ', gpt_entry_data[32:48])
+                    part_name = gpt_entry_data[56:128].decode('utf-16le', errors='replace').rstrip('\x00')
+                    num_sectors = (last_lba - first_lba) + 1
+                    
+                    print(_("\n[+] Desglose de la Entrada GPT #{idx}:").format(idx=idx))
+                    print(f"  - Offset 0x00 (GUID Tipo)  : \033[92m{type_guid}\033[0m -> Tipo de partición: {part.type_name}")
+                    print(f"  - Offset 0x20 (Primer LBA)  : \033[93m{first_lba}\033[0m -> Sector físico de inicio.")
+                    print(f"  - Offset 0x28 (Último LBA)  : \033[96m{last_lba}\033[0m -> Sector físico de fin.")
+                    print(f"  - Offset 0x38 (Nombre Part) : \033[95m{part_name}\033[0m -> Etiqueta de la partición (Unicode UTF-16LE).")
+                    print(f"  - Tamaño Calculado         : {num_sectors} sectores ({num_sectors * 512 / (1024**2):.2f} MB)")
             print("==================================================================================\n")
             
         else:
