@@ -88,10 +88,17 @@ class NTFSShell(cmd.Cmd):
             
         import os
         import re
+        import sys
+        
+        # Si es una letra de unidad en Windows (ej: f: o F: o f:\ o F:\)
+        if sys.platform == "win32" and re.match(r'^[a-zA-Z]:\\?$', image_path):
+            drive_letter = image_path[0].upper()
+            image_path = rf"\\.\{drive_letter}:"
+
         from core.data_source import RawImageSource, E01ImageSource, SplitRawImageSource
         from core.partition_manager import MBRParser
 
-        if not os.path.exists(image_path) and not image_path.startswith(r"\\.\PhysicalDrive"):
+        if not os.path.exists(image_path) and not image_path.startswith("\\\\.\\"):
             print(_("Error: El archivo {image_path} no existe.").format(image_path=image_path))
             return
 
