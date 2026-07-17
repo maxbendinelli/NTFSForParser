@@ -79,7 +79,14 @@ def main():
             print("\nSaliendo...")
         return
 
-    if not os.path.exists(image_path) and not image_path.startswith(r"\\.\PhysicalDrive"):
+    # Si es una letra de unidad en Windows (ej: f: o F: o f:\ o F:\)
+    if sys.platform == "win32" and re.match(r'^[a-zA-Z]:\\?$', image_path):
+        drive_letter = image_path[0].upper()
+        image_path = rf"\\.\{drive_letter}:"
+    else:
+        image_path = os.path.normpath(image_path)
+
+    if not os.path.exists(image_path) and not image_path.startswith("\\\\.\\"):
         print(_("Error: El archivo {image_path} no existe.").format(image_path=image_path))
         sys.exit(1)
 

@@ -94,6 +94,8 @@ class NTFSShell(cmd.Cmd):
         if sys.platform == "win32" and re.match(r'^[a-zA-Z]:\\?$', image_path):
             drive_letter = image_path[0].upper()
             image_path = rf"\\.\{drive_letter}:"
+        else:
+            image_path = os.path.normpath(image_path)
 
         from core.data_source import RawImageSource, E01ImageSource, SplitRawImageSource
         from core.partition_manager import MBRParser
