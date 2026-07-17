@@ -50,18 +50,22 @@ def main():
             print(_("Error: Los comandos por línea de comandos (CLI) requieren especificar una imagen forense."))
             sys.exit(1)
             
-        banner = r"""
+        color_green = "\033[92m"
+        color_cyan = "\033[96m"
+        color_bold = "\033[1m"
+        color_reset = "\033[0m"
+        
+        banner = f"""{color_green}
     _   __________________  ______          ____                           
-   / | / /_  __/ ____/ __ \/ ____/___  ____/ __ \____ ______________  _____
-  /  |/ / / / / /_  / /_/ / /_  / __ \/ __/ /_/ / __ `/ ___/ ___/ _ \/ ___/
+   / | / /_  __/ ____/ __ \\/ ____/___  ____/ __ \\____ ______________  _____
+  /  |/ / / / / /_  / /_/ / /_  / __ \\/ __/ /_/ / __ `/ ___/ ___/ _ \\/ ___/
  / /|  / / / / __/ / _, _/ __/ / /_/ / / / ____/ /_/ / /  (__  )  __/ /    
-/_/ |_/ /_/ /_/   /_/ |_/_/    \____/_/ /_/    \__,_/_/  /____/\___/_/     
-        """
+/_/ |_/ /_/ /_/   /_/ |_/_/    \\____/_/ /_/    \\__,_/_/  /____/\\___/_/{color_reset}
+{color_cyan}=========================================================================={color_reset}
+{color_cyan}=========================================================================={color_reset}
+{color_bold} v1.0.0 - Framework Educativo de Informática Forense | Por: Max Bendinelli{color_reset}
+{color_cyan}=========================================================================={color_reset}"""
         print(banner)
-        print("==========================================================================")
-        print("==========================================================================")
-        print(_(" v1.0.0 - Framework Educativo de Informática Forense | Por: Max Bendinelli"))
-        print("==========================================================================")
         print(_("\n[!] Advertencia: No se ha especificado ninguna imagen forense."))
         print(_("    Por favor, usa el comando 'open <ruta_imagen>' para cargar una.\n"))
         
@@ -92,18 +96,22 @@ def main():
 
     try:
         if not (args.partitions or args.sector is not None or args.cluster is not None or args.identify_sector is not None or args.identify_cluster is not None):
-            banner = r"""
+            color_green = "\033[92m"
+            color_cyan = "\033[96m"
+            color_bold = "\033[1m"
+            color_reset = "\033[0m"
+            
+            banner = f"""{color_green}
     _   __________________  ______          ____                           
-   / | / /_  __/ ____/ __ \/ ____/___  ____/ __ \____ ______________  _____
-  /  |/ / / / / /_  / /_/ / /_  / __ \/ __/ /_/ / __ `/ ___/ ___/ _ \/ ___/
+   / | / /_  __/ ____/ __ \\/ ____/___  ____/ __ \\____ ______________  _____
+  /  |/ / / / / /_  / /_/ / /_  / __ \\/ __/ /_/ / __ `/ ___/ ___/ _ \\/ ___/
  / /|  / / / / __/ / _, _/ __/ / /_/ / / / ____/ /_/ / /  (__  )  __/ /    
-/_/ |_/ /_/ /_/   /_/ |_/_/    \____/_/ /_/    \__,_/_/  /____/\___/_/     
-            """
+/_/ |_/ /_/ /_/   /_/ |_/_/    \\____/_/ /_/    \\__,_/_/  /____/\\___/_/{color_reset}
+{color_cyan}=========================================================================={color_reset}
+{color_cyan}=========================================================================={color_reset}
+{color_bold} v1.0.0 - Framework Educativo de Informática Forense | Por: Max Bendinelli{color_reset}
+{color_cyan}=========================================================================={color_reset}"""
             print(banner)
-            print("==========================================================================")
-            print("==========================================================================")
-            print(_(" v1.0.0 - Framework Educativo de Informática Forense | Por: Max Bendinelli"))
-            print("==========================================================================")
             print(_("\n[+] Cargando fuente de datos: {image_path}").format(image_path=image_path))
             
         # 1. Determinar tipo de fuente de datos
