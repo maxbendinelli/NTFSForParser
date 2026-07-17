@@ -36,6 +36,16 @@ class NTFSShell(cmd.Cmd):
         self.current_directory_id = None
         self.current_path = "/"
         self.update_prompt()
+        
+        # Ajustar delimitadores de readline para soportar rutas con barras y dos puntos
+        try:
+            import readline
+            delims = readline.get_completer_delims()
+            for char in ['/', '\\', ':', '-']:
+                delims = delims.replace(char, '')
+            readline.set_completer_delims(delims)
+        except ImportError:
+            pass
 
     def update_prompt(self):
         if self.data_source is None:
@@ -1967,6 +1977,13 @@ if __name__ == "__main__":
     print("\n[!] Advertencia: No se ha especificado ninguna imagen forense.")
     print("    Por favor, usa el comando 'open <ruta_imagen>' para cargar una.\n")
     
+    if sys.platform == "win32":
+        try:
+            import readline
+        except ImportError:
+            print("[i] Nota didáctica: Para habilitar el autocompletado interactivo con la tecla <Tab> en Windows, instalá:")
+            print("    pip install pyreadline3\n")
+            
     shell = NTFSShell(None, None)
     try:
         shell.cmdloop()

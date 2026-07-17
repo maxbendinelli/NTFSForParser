@@ -65,6 +65,13 @@ def main():
         print(_("\n[!] Advertencia: No se ha especificado ninguna imagen forense."))
         print(_("    Por favor, usa el comando 'open <ruta_imagen>' para cargar una.\n"))
         
+        if sys.platform == "win32":
+            try:
+                import readline
+            except ImportError:
+                print(_("[i] Nota didáctica: Para habilitar el autocompletado interactivo con la tecla <Tab> en Windows, instalá:"))
+                print("    pip install pyreadline3\n")
+        
         shell = NTFSShell(None, None)
         try:
             shell.cmdloop()

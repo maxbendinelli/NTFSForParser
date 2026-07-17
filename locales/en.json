@@ -216,5 +216,7 @@
     "    [!] ¡Atención! Esta partición está cifrada con BitLocker (Firma -FVE-FS- detectada).": "    [!] Attention: This partition is encrypted with BitLocker (-FVE-FS- signature detected).",
     "    Los metadatos lógicos están protegidos por cifrado completo de volumen.": "    Logical metadata is protected by full volume encryption.",
     "    No se puede parsear de forma lógica, pero puedes realizar carving forense ('carve') o volcar bloques crudos ('sector' / 'hexdump').": "    Logical parsing is unavailable, but you can perform forensic carving ('carve') or dump raw blocks ('sector' / 'hexdump').",
-    "    -> ¡Es un Sector de Arranque de BitLocker (Volumen Cifrado)! (Firma -FVE-FS- detectada)": "    -> BitLocker Boot Sector (Encrypted Volume)! (-FVE-FS- signature detected)"
+    "    -> ¡Es un Sector de Arranque de BitLocker (Volumen Cifrado)! (Firma -FVE-FS- detectada)": "    -> BitLocker Boot Sector (Encrypted Volume)! (-FVE-FS- signature detected)",
+    "[i] Nota didáctica: Para habilitar el autocompletado interactivo con la tecla <Tab> en Windows, instalá:": "[i] Educational note: To enable interactive tab completion on Windows, install:",
+    "    pip install pyreadline3\n": "    pip install pyreadline3\n"
 }
