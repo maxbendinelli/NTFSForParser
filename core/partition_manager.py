@@ -168,3 +168,47 @@ class MBRParser:
                 raw_bytes=entry
             )
             self.partitions.append(partition)
+
+    def get_unallocated_spaces(self) -> list:
+        """
+        Retorna una lista de diccionarios con los rangos de LBA y tamaño del espacio sin particionar.
+        Ej: [{"start_lba": 2048, "size_in_sectors": 2048, "size_in_bytes": 1048576}]
+        """
+        try:
+            total_size_bytes = self.data_source.get_size()
+            total_sectors = total_size_bytes // self.sector_size
+        except Exception:
+            return []
+            
+        # Determinar el LBA de inicio seguro para datos (saltando metadatos de tabla)
+        # GPT reserva los primeros 34 sectores. MBR solo usa el sector 0.
+        start_scan_lba = 34 if self.is_gpt else 1
+        
+        # Filtrar y ordenar particiones por su start_lba
+        active_parts = sorted(self.partitions, key=lambda p: p.start_lba)
+        
+        unallocated = []
+        current_lba = start_scan_lba
+        
+        for part in active_parts:
+            # Si hay un hueco entre el LBA actual y el inicio de la partición
+            if part.start_lba > current_lba:
+                gap_sectors = part.start_lba - current_lba
+                unallocated.append({
+                    "start_lba": current_lba,
+                    "size_in_sectors": gap_sectors,
+                    "size_in_bytes": gap_sectors * self.sector_size
+                })
+            current_lba = max(current_lba, part.start_lba + part.size_in_sectors)
+            
+        # Verificar espacio libre al final del disco (dejando los 33 sectores de backup GPT si es GPT)
+        end_data_lba = total_sectors - 33 if self.is_gpt else total_sectors
+        if current_lba < end_data_lba:
+            gap_sectors = end_data_lba - current_lba
+            unallocated.append({
+                "start_lba": current_lba,
+                "size_in_sectors": gap_sectors,
+                "size_in_bytes": gap_sectors * self.sector_size
+            })
+            
+        return unallocated

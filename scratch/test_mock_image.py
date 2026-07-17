@@ -527,10 +527,36 @@ def verify_all_filesystems():
     assert "Cilindros" in diskinfo_output
     print("    [OK] Comando 'diskinfo' verificado exitosamente.")
 
+    # ------------------ 17. TEST DE PARTITIONS -V Y UNALLOCATED SPACE ------------------
+    print("\n[+] 17. Validando Comando 'partitions -v' y Espacio no Asignado...")
+    shell_parts = NTFSShell(source, MBRParser(source))
+    
+    sys.stdout = io.StringIO()
+    try:
+        shell_parts.do_partitions("")
+        parts_std_out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    print("       Salida de partitions estándar en test:")
+    print("\n".join("         " + line for line in parts_std_out.strip().split("\n") if line))
+    assert "Espacio sin particionar" in parts_std_out
+    
+    sys.stdout = io.StringIO()
+    try:
+        shell_parts.do_partitions("-v")
+        parts_verbose_out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    print("       Salida de partitions -v en test:")
+    print("\n".join("         " + line for line in parts_verbose_out.strip().split("\n")[:20] if line) + "\n         ...")
+    assert "ANÁLISIS EXPLICATIVO" in parts_verbose_out
+    assert "GPT Header" in parts_verbose_out
+    print("    [OK] Desglose didáctico y espacio sin particionar validados correctamente.")
+
     # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER, HISTORIAL Y DISKINFO SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER, HISTORIAL, DISKINFO Y PARTITIONS EXPLICATIVO SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()

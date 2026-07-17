@@ -94,7 +94,11 @@ class NTFSShell(cmd.Cmd):
     # --- Comandos Generales ---
     
     def do_partitions(self, arg):
-        """Lista las particiones encontradas en el disco."""
+        """Lista las particiones encontradas en el disco y las áreas sin particionar.
+        Uso:
+          partitions        -> Listado simple
+          partitions -v     -> Explicación didáctica coloreada en Hexadecimal (MBR/GPT)
+        """
         if arg.strip() in ('?', '-h', '--help'):
             print(_(self.do_partitions.__doc__))
             return
@@ -102,14 +106,203 @@ class NTFSShell(cmd.Cmd):
             print(_("No se encontraron particiones (Asegúrate de abrir una imagen primero usando 'open')."))
             return
             
-        print(_("\nParticiones disponibles:"))
+        args = arg.split()
+        if "-v" in args or "--verbose" in args:
+            self._print_partitions_breakdown()
+            return
+            
+        print(_("\nParticiones disponibles y espacio sin particionar:"))
+        print(f"  {'LBA Inicio':<12} | {'LBA Fin':<12} | {'Estado / Tipo de Partición':<45} | {'Tamaño':<10}")
+        print("  " + "-" * 90)
+        
+        # Intercalar particiones y espacios libres ordenados por LBA
+        all_blocks = []
         for idx, part in enumerate(self.mbr_parser.partitions):
-            boot = "*" if part.bootable else " "
-            size_mb = part.size_in_bytes / (1024**2)
-            print(_("  [{idx}] {boot} {type_name} | Offset: {start_offset} | Tamaño: {size_mb:.2f} MB").format(
-                idx=idx, boot=boot, type_name=part.type_name, 
-                start_offset=part.start_offset, size_mb=size_mb))
+            boot_flag = " [*]" if part.bootable else ""
+            all_blocks.append({
+                "start_lba": part.start_lba,
+                "end_lba": part.start_lba + part.size_in_sectors - 1,
+                "type": f"[{idx}] {part.type_name}{boot_flag}",
+                "size_bytes": part.size_in_bytes,
+                "is_partition": True
+            })
+            
+        unallocated = self.mbr_parser.get_unallocated_spaces()
+        for gap in unallocated:
+            all_blocks.append({
+                "start_lba": gap["start_lba"],
+                "end_lba": gap["start_lba"] + gap["size_in_sectors"] - 1,
+                "type": f"\033[91m{_( 'Espacio sin particionar (Unallocated)')}\033[0m",
+                "size_bytes": gap["size_in_bytes"],
+                "is_partition": False
+            })
+            
+        all_blocks = sorted(all_blocks, key=lambda b: b["start_lba"])
+        
+        for b in all_blocks:
+            size_mb = b["size_bytes"] / (1024**2)
+            size_str = f"{size_mb:.1f} MB" if size_mb < 1024 else f"{size_mb/1024:.2f} GB"
+            print(f"  {b['start_lba']:<12} | {b['end_lba']:<12} | {b['type']:<54} | {size_str:<10}")
         print("")
+
+    def _print_partitions_breakdown(self):
+        """Genera un reporte didáctico coloreado en Hexadecimal del sector de la tabla de particiones."""
+        import struct
+        
+        if self.mbr_parser.is_gpt:
+            print(_("\n=================================================================================="))
+            print(_("  ANÁLISIS EXPLICATIVO DE LA TABLA DE PARTICIONES GPT - LBA 1 Y LBA 2"))
+            print(_("=================================================================================="))
+            
+            # Leer LBA 1 (GPT Header)
+            gpt_header = self.data_source.read(512, 512)
+            if len(gpt_header) < 512:
+                print(_("Error al leer el GPT Header."))
+                return
+                
+            print(_("\n[i] Volcado hexadecimal del GPT Header (LBA 1, primeros 96 bytes):"))
+            print("Offset    | Hexadecimal                                     | ASCII")
+            print("-" * 75)
+            
+            for i in range(0, 96, 16):
+                chunk = gpt_header[i:i+16]
+                hex_str = ""
+                ascii_str = ""
+                for j, b in enumerate(chunk):
+                    offset = i + j
+                    if 0 <= offset < 8: # Firma "EFI PART"
+                        color = "\033[92m" # Verde
+                    elif 72 <= offset < 80: # LBA de Entradas
+                        color = "\033[93m" # Amarillo
+                    elif 80 <= offset < 84: # Cantidad de Entradas
+                        color = "\033[96m" # Cian
+                    elif 84 <= offset < 88: # Tamaño de Entrada
+                        color = "\033[95m" # Magenta
+                    else:
+                        color = "\033[90m" # Gris
+                    hex_str += f"{color}{b:02x}\033[0m "
+                    ascii_str += f"{color}{chr(b) if 32 <= b <= 127 else '.'}\033[0m"
+                print(f"0x{i:02x}       | {hex_str} | {ascii_str}")
+                
+            sig = gpt_header[0:8].decode('ascii', errors='ignore')
+            entries_lba = struct.unpack('<Q', gpt_header[72:80])[0]
+            num_entries = struct.unpack('<I', gpt_header[80:84])[0]
+            entry_size = struct.unpack('<I', gpt_header[84:88])[0]
+            
+            print(_("\n[+] Desglose del GPT Header (LBA 1):"))
+            print(f"  - Offset 0x00 (Firma)      : \033[92m{sig}\033[0m -> Firma EFI PART válida.")
+            print(f"  - Offset 0x48 (LBA Entradas): \033[93m{entries_lba}\033[0m -> LBA donde empieza el array de particiones.")
+            print(f"  - Offset 0x50 (Num Entradas): \033[96m{num_entries}\033[0m -> Cantidad máxima de particiones soportadas.")
+            print(f"  - Offset 0x54 (Tamaño Ent.):  \033[95m{entry_size}\033[0m -> Tamaño en bytes de cada registro de partición.")
+            
+            # Leer la primera entrada GPT en LBA 2
+            gpt_entry_data = self.data_source.read(entries_lba * 512, 128)
+            if len(gpt_entry_data) >= 128:
+                print(_("\n[i] Volcado hexadecimal de la Primera Entrada GPT (LBA 2, 128 bytes):"))
+                print("Offset    | Hexadecimal                                     | ASCII")
+                print("-" * 75)
+                
+                for i in range(0, 128, 16):
+                    chunk = gpt_entry_data[i:i+16]
+                    hex_str = ""
+                    ascii_str = ""
+                    for j, b in enumerate(chunk):
+                        offset = i + j
+                        if 0 <= offset < 16: # GUID de Tipo
+                            color = "\033[92m"
+                        elif 16 <= offset < 32: # GUID de Partición
+                            color = "\033[90m"
+                        elif 32 <= offset < 40: # Primer LBA
+                            color = "\033[93m"
+                        elif 40 <= offset < 48: # Último LBA
+                            color = "\033[96m"
+                        elif 56 <= offset < 128: # Nombre UTF-16LE
+                            color = "\033[95m"
+                        else:
+                            color = "\033[0m"
+                        hex_str += f"{color}{b:02x}\033[0m "
+                        ascii_str += f"{color}{chr(b) if 32 <= b <= 127 else '.'}\033[0m"
+                    print(f"0x{i:02x}       | {hex_str} | {ascii_str}")
+                    
+                import uuid
+                type_guid = uuid.UUID(bytes_le=gpt_entry_data[0:16])
+                first_lba, last_lba = struct.unpack('<QQ', gpt_entry_data[32:48])
+                part_name = gpt_entry_data[56:128].decode('utf-16le', errors='replace').rstrip('\x00')
+                num_sectors = (last_lba - first_lba) + 1
+                
+                print(_("\n[+] Desglose de la Primera Entrada GPT (LBA 2):"))
+                print(f"  - Offset 0x00 (GUID Tipo)  : \033[92m{type_guid}\033[0m -> Tipo de partición.")
+                print(f"  - Offset 0x20 (Primer LBA)  : \033[93m{first_lba}\033[0m -> Sector físico de inicio.")
+                print(f"  - Offset 0x28 (Último LBA)  : \033[96m{last_lba}\033[0m -> Sector físico de fin.")
+                print(f"  - Offset 0x38 (Nombre Part) : \033[95m{part_name}\033[0m -> Etiqueta de la partición (Unicode UTF-16LE).")
+                print(f"  - Tamaño Calculado         : {num_sectors} sectores ({num_sectors * 512 / (1024**2):.2f} MB)")
+            print("==================================================================================\n")
+            
+        else:
+            print(_("\n=================================================================================="))
+            print(_("  ANÁLISIS EXPLICATIVO DEL MASTER BOOT RECORD (MBR) - SECTOR 0"))
+            print(_("=================================================================================="))
+            
+            mbr_data = self.data_source.read(0, 512)
+            if len(mbr_data) < 512:
+                print(_("Error al leer el MBR."))
+                return
+                
+            print(_("\n[i] Volcado hexadecimal de la Tabla de Particiones en LBA 0 (Offset 440 a 512):"))
+            print("Offset    | Hexadecimal                                     | ASCII")
+            print("-" * 75)
+            
+            for i in range(432, 512, 16):
+                chunk = mbr_data[i:i+16]
+                hex_str = ""
+                ascii_str = ""
+                for j, b in enumerate(chunk):
+                    offset = i + j
+                    if 446 <= offset < 462: # Partición 1
+                        color = "\033[92m" # Verde
+                    elif 462 <= offset < 478: # Partición 2
+                        color = "\033[93m" # Amarillo
+                    elif 478 <= offset < 494: # Partición 3
+                        color = "\033[96m" # Cian
+                    elif 494 <= offset < 510: # Partición 4
+                        color = "\033[95m" # Magenta
+                    elif 510 <= offset < 512: # Firma 55 AA
+                        color = "\033[91m" # Rojo
+                    else:
+                        color = "\033[90m" # Gris
+                    hex_str += f"{color}{b:02x}\033[0m "
+                    ascii_str += f"{color}{chr(b) if 32 <= b <= 127 else '.'}\033[0m"
+                print(f"0x{i:03x}      | {hex_str} | {ascii_str}")
+                
+            print(_("\n[+] Explicación de la Firma de Arranque (Magic Bytes):"))
+            print(f"  Offset 0x1fe (510-511): \033[91m{mbr_data[510:512].hex().upper()}\033[0m -> {_('Firma de arranque de sector válida (0x55AA).') if mbr_data[510:512] == b'\\x55\\xaa' else _('Firma de arranque inválida.')}")
+            
+            print(_("\n[+] Desglose de Entradas MBR (16 bytes cada una):"))
+            colors = ["\033[92m", "\033[93m", "\033[96m", "\033[95m"]
+            names = ["Partición 1", "Partición 2", "Partición 3", "Partición 4"]
+            
+            for idx in range(4):
+                offset_part = 446 + (idx * 16)
+                p_bytes = mbr_data[offset_part : offset_part + 16]
+                
+                if p_bytes[4] == 0x00 and struct.unpack('<I', p_bytes[12:16])[0] == 0:
+                    print(f"\n  - \033[90m{names[idx]} (Offset {hex(offset_part)}): Entrada vacía / Sin uso.\033[0m")
+                    continue
+                    
+                status = p_bytes[0]
+                p_type = p_bytes[4]
+                start_lba = struct.unpack('<I', p_bytes[8:12])[0]
+                num_sectors = struct.unpack('<I', p_bytes[12:16])[0]
+                
+                color = colors[idx]
+                print(f"\n  - {color}{names[idx]} (Offset {hex(offset_part)}):\033[0m")
+                print(f"    - Byte 0    (Status)    : \033[1m{hex(status)}\033[0m -> {_('Activa / Booteable') if status == 0x80 else _('Inactiva')}")
+                print(f"    - Bytes 1-3 (CHS Inicio): {p_bytes[1:4].hex().upper()}")
+                print(f"    - Byte 4    (Tipo)      : \033[1m{hex(p_type)}\033[0m -> {self.mbr_parser.PARTITION_TYPES.get(p_type, 'Desconocida')}")
+                print(f"    - Bytes 5-7 (CHS Fin)   : {p_bytes[5:8].hex().upper()}")
+                print(f"    - Bytes 8-11 (LBA Init) : \033[1m{start_lba}\033[0m (Hex: {hex(start_lba)}) -> {_('Sector de inicio físico en disco')}")
+                print(f"    - Bytes 12-15(Sectores) : \033[1m{num_sectors}\033[0m -> {_('Tamaño')}: {num_sectors * 512 / (1024**2):.2f} MB")
+            print("==================================================================================\n")
 
     def do_open(self, arg):
         """Abre y monta una imagen forense (.dd, .raw, .001, .e01) o disco físico. Uso: open <ruta_imagen>"""
