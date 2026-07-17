@@ -638,7 +638,7 @@ class NTFSShell(cmd.Cmd):
             print(f"Error durante la identificación: {e}")
             
     def do_ls(self, arg):
-        """Lista archivos en el directorio actual."""
+        """Lista archivos en el directorio actual mostrando creación, modificación y último acceso."""
         if arg.strip() in ('?', '-h', '--help'):
             print(_(self.do_ls.__doc__))
             return
@@ -648,8 +648,9 @@ class NTFSShell(cmd.Cmd):
             
         if isinstance(self.current_parser, NTFSParser):
             print(_("\n[+] Escaneando registros MFT apuntando a '{path}' (Parent ID: {dir_id})...").format(path=self.current_path, dir_id=self.current_directory_id))
-            print(_("{id:<8} | {type:<6} | {status:<10} | {mod:<20} | {name}").format(id="ID", type="Tipo", status="Estado", mod="Modificación", name="Nombre del Archivo"))
-            print("-" * 80)
+            print(_("{id:<8} | {type:<5} | {status:<8} | {created:<19} | {modified:<19} | {accessed:<19} | {name}").format(
+                id="ID", type="Tipo", status="Estado", created="Creación", modified="Modificación", accessed="Acceso", name="Nombre"))
+            print("-" * 115)
             
             self.ntfs_files_cache.clear()
             
@@ -670,9 +671,11 @@ class NTFSShell(cmd.Cmd):
                         
                         tipo = "DIR" if record.is_directory() else "FILE"
                         estado = _("Activo") if record.is_in_use() else _("Borrado")
+                        created_date = record.created if record.created else "N/A"
                         mod_date = record.modified if record.modified else "N/A"
+                        acc_date = record.accessed if record.accessed else "N/A"
                         
-                        print(f"{i:<8} | {tipo:<6} | {estado:<10} | {mod_date:<20} | {record.file_name}")
+                        print(f"{i:<8} | {tipo:<5} | {estado:<8} | {created_date:<19} | {mod_date:<19} | {acc_date:<19} | {record.file_name}")
                 except Exception:
                     pass
             print(_("\n[+] Fin del escaneo."))
@@ -687,13 +690,16 @@ class NTFSShell(cmd.Cmd):
                 else:
                     self.fat_files_cache = self.current_parser.get_directory_entries(self.current_directory_id)
                     
-                print(_("{id:<8} | {type:<6} | {status:<10} | {size:<10} | {mod:<20} | {name}").format(id="ID", type="Tipo", status="Estado", size="Tamaño", mod="Modificación", name="Nombre"))
-                print("-" * 90)
+                print(_("{id:<8} | {type:<5} | {status:<8} | {size:<10} | {created:<19} | {modified:<19} | {accessed:<19} | {name}").format(
+                    id="ID", type="Tipo", status="Estado", size="Tamaño", created="Creación", modified="Modificación", accessed="Acceso", name="Nombre"))
+                print("-" * 125)
                 for idx, entry in enumerate(self.fat_files_cache):
                     tipo = "DIR" if entry.is_directory else "FILE"
                     estado = _("Borrado") if entry.is_deleted else _("Activo")
+                    created_date = entry.created if entry.created else "N/A"
                     mod_date = entry.modified if entry.modified else "N/A"
-                    print(f"{idx:<8} | {tipo:<6} | {estado:<10} | {entry.size:<10} | {mod_date:<20} | {entry.name}")
+                    acc_date = entry.accessed if entry.accessed else "N/A"
+                    print(f"{idx:<8} | {tipo:<5} | {estado:<8} | {entry.size:<10} | {created_date:<19} | {mod_date:<19} | {acc_date:<19} | {entry.name}")
             except Exception as e:
                 print(_("Error al leer FAT: {error}").format(error=e))
         elif isinstance(self.current_parser, Ext4Parser):
@@ -1302,8 +1308,9 @@ class NTFSShell(cmd.Cmd):
                     pass
 
             print(_("\n[+] Escaneando los primeros {limit} registros MFT en busca de archivos borrados...").format(limit=limit))
-            print(_("{id:<8} | {type:<6} | {status:<10} | {mod:<20} | {name}").format(id="ID", type="Tipo", status="Estado", mod="Modificación", name="Nombre del Archivo"))
-            print("-" * 80)
+            print(_("{id:<8} | {type:<5} | {status:<8} | {created:<19} | {modified:<19} | {accessed:<19} | {name}").format(
+                id="ID", type="Tipo", status="Estado", created="Creación", modified="Modificación", accessed="Acceso", name="Nombre del Archivo"))
+            print("-" * 115)
 
             deleted_found = 0
             for i in range(limit):
@@ -1316,8 +1323,10 @@ class NTFSShell(cmd.Cmd):
                     if not record.is_in_use() and record.file_name:
                         tipo = "DIR" if record.is_directory() else "FILE"
                         estado = _("Borrado")
+                        created_date = record.created if record.created else "N/A"
                         mod_date = record.modified if record.modified else "N/A"
-                        print(f"{i:<8} | {tipo:<6} | {estado:<10} | {mod_date:<20} | {record.file_name}")
+                        acc_date = record.accessed if record.accessed else "N/A"
+                        print(f"{i:<8} | {tipo:<5} | {estado:<8} | {created_date:<19} | {mod_date:<19} | {acc_date:<19} | {record.file_name}")
                         deleted_found += 1
                 except Exception:
                     pass
@@ -1336,14 +1345,17 @@ class NTFSShell(cmd.Cmd):
                 # Filtrar solo las entradas borradas
                 self.fat_files_cache = [entry for entry in all_entries if entry.is_deleted]
 
-                print(_("{id:<8} | {type:<6} | {status:<10} | {size:<10} | {mod:<20} | {name}").format(id="ID", type="Tipo", status="Estado", size="Tamaño", mod="Modificación", name="Nombre"))
-                print("-" * 90)
+                print(_("{id:<8} | {type:<5} | {status:<8} | {size:<10} | {created:<19} | {modified:<19} | {accessed:<19} | {name}").format(
+                    id="ID", type="Tipo", status="Estado", size="Tamaño", created="Creación", modified="Modificación", accessed="Acceso", name="Nombre"))
+                print("-" * 125)
 
                 for idx, entry in enumerate(self.fat_files_cache):
                     tipo = "DIR" if entry.is_directory else "FILE"
                     estado = _("Borrado")
+                    created_date = entry.created if entry.created else "N/A"
                     mod_date = entry.modified if entry.modified else "N/A"
-                    print(f"{idx:<8} | {tipo:<6} | {estado:<10} | {entry.size:<10} | {mod_date:<20} | {entry.name}")
+                    acc_date = entry.accessed if entry.accessed else "N/A"
+                    print(f"{idx:<8} | {tipo:<5} | {estado:<8} | {entry.size:<10} | {created_date:<19} | {mod_date:<19} | {acc_date:<19} | {entry.name}")
 
                 print(_("\n[+] Fin del escaneo. Borrados encontrados: {count}").format(count=len(self.fat_files_cache)))
             except Exception as e:
