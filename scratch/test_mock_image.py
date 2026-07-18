@@ -636,10 +636,30 @@ def verify_all_filesystems():
     assert "LEYENDA" in map_out
     print("    [OK] Distribución visual de clústeres validada correctamente.")
 
+    # ------------------ 21. TEST DE GUI (INTERFAZ GRÁFICA DE TKINTER) ------------------
+    print("\n[+] 21. Validando Inicialización del Comando 'gui' (Tkinter)...")
+    shell_gui = NTFSShell(source, MBRParser(source))
+    
+    shell_empty_gui = NTFSShell(None, None)
+    sys.stdout = io.StringIO()
+    try:
+        shell_empty_gui.do_gui("")
+        empty_gui_out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    assert "No hay ninguna imagen cargada" in empty_gui_out
+    
+    from core.gui import ForensicGui
+    gui_inst = ForensicGui(source, MBRParser(source), selected_partition=4)
+    assert gui_inst.selected_partition == 4
+    assert gui_inst.root is not None
+    gui_inst.root.destroy()
+    print("    [OK] Estructura e instanciación de ForensicGui validadas correctamente.")
+
     # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER, HISTORIAL, DISKINFO, PARTITIONS EXPLICATIVO, VBRINFO, LISTADO DE DISPOSITIVOS Y MAPA DE CLÚSTERES SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER, HISTORIAL, DISKINFO, PARTITIONS EXPLICATIVO, VBRINFO, LISTADO DE DISPOSITIVOS, MAPA DE CLÚSTERES Y GUI SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()

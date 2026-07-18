@@ -688,6 +688,43 @@ class NTFSShell(cmd.Cmd):
         print(f"    - \033[90m.\033[0m : {_('Rango Totalmente Libre (Unallocated)')}")
         print("==================================================================================\n")
 
+    def do_gui(self, arg):
+        """Abre una ventana de interfaz gráfica (GUI) interactiva para visualizar las particiones y clústeres del disco."""
+        if arg.strip() in ('?', '-h', '--help'):
+            print(_(self.do_gui.__doc__))
+            return
+            
+        if not self.data_source:
+            print(_("No hay ninguna imagen cargada. Usa 'open <ruta_imagen>' primero."))
+            return
+            
+        try:
+            from core.gui import ForensicGui
+        except ImportError as e:
+            print(_("Error al cargar el módulo gráfico: {error}").format(error=e))
+            return
+            
+        def on_partition_select(index):
+            try:
+                self.do_select(str(index))
+            except Exception as e:
+                print(_("Error al seleccionar partición [{index}] en segundo plano: {error}").format(index=index, error=e))
+                
+        print(_("[+] Iniciando interfaz gráfica interactiva..."))
+        print(_("[i] Cierra la ventana gráfica para retornar el control de esta consola."))
+        
+        try:
+            gui = ForensicGui(
+                data_source=self.data_source,
+                mbr_parser=self.mbr_parser,
+                selected_partition=self.selected_partition,
+                on_partition_select=on_partition_select
+            )
+            gui.run()
+            print(_("[+] Interfaz gráfica cerrada. Consola forense lista."))
+        except Exception as e:
+            print(_("Error al arrancar la interfaz gráfica: {error}").format(error=e))
+
     def _list_available_devices(self):
         """Lista los dispositivos físicos y unidades lógicas disponibles en el host actual (Windows o Linux)."""
         import sys

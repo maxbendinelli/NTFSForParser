@@ -293,5 +293,12 @@
     "Rango Mayormente Asignado (>50% Usado)": "Mostly Allocated Block (>50% Used)",
     "Rango Parcialmente Asignado (10% - 50% Usado)": "Partially Allocated Block (10% - 50% Used)",
     "Rango con Asignación Mínima (<10% Usado)": "Minimally Allocated Block (<10% Used)",
-    "Rango Totalmente Libre (Unallocated)": "Unallocated Block (100% Free)"
+    "Rango Totalmente Libre (Unallocated)": "Unallocated Block (100% Free)",
+    "Abre una ventana de interfaz gráfica (GUI) interactiva para visualizar las particiones y clústeres del disco.\n        Uso: gui\n        ": "Open an interactive graphical user interface (GUI) window to visualize disk partitions and clusters.\n        Usage: gui\n        ",
+    "Error al cargar el módulo gráfico: {error}": "Error loading graphical module: {error}",
+    "Error al seleccionar partición [{index}] en segundo plano: {error}": "Error selecting partition [{index}] in background: {error}",
+    "[+] Iniciando interfaz gráfica interactiva...": "[+] Launching interactive graphical interface...",
+    "[i] Cierra la ventana gráfica para retornar el control de esta consola.": "[i] Close the GUI window to return control to this console.",
+    "[+] Interfaz gráfica cerrada. Consola forense lista.": "[+] Graphical interface closed. Forensic console ready.",
+    "Error al arrancar la interfaz gráfica: {error}": "Error starting graphical interface: {error}"
 }
