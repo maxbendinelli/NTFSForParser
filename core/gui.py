@@ -83,6 +83,9 @@ class ForensicGui:
         self.lbl_free_clusters = ttk.Label(stats_frame, text="Clústeres libres: N/A")
         self.lbl_free_clusters.pack(anchor="w", pady=3)
         
+        self.lbl_warning = ttk.Label(stats_frame, text="", wraplength=250, foreground="#ffaa00", font=("Helvetica", 9, "italic"))
+        self.lbl_warning.pack(anchor="w", pady=10)
+        
         # Leyenda de colores del mapa de clústeres
         legend_frame = ttk.Frame(stats_frame, padding=5)
         legend_frame.pack(fill="x", side="bottom")
@@ -122,7 +125,7 @@ class ForensicGui:
         blocks = []
         current_lba = 34 if self.mbr_parser.is_gpt else 1
         
-        for idx, part in enumerate(self.mbr_parser.partitions):
+        for idx, part in enumerate(active_parts):
             original_idx = self.mbr_parser.partitions.index(part)
             if part.start_lba > current_lba:
                 blocks.append({
@@ -300,6 +303,13 @@ class ForensicGui:
                     bitmap[i] = True
                 else:
                     bitmap[i] = (random.randint(0, 100) < 30)
+                    
+        if fs_type == "DESCONOCIDO":
+            self.lbl_warning.config(text="⚠️ Advertencia: Partición sin sistema de archivos compatible. Mostrando simulación didáctica de ocupación.")
+        elif not has_real_data:
+            self.lbl_warning.config(text="⚠️ Nota: No se pudo leer el bitmap. Mostrando simulación didáctica.")
+        else:
+            self.lbl_warning.config(text="")
                     
         used_count = sum(1 for b in bitmap if b)
         self.lbl_used_clusters.config(text=f"Clústeres usados: {used_count} ({used_count/total_clusters*100:.1f}%)")
