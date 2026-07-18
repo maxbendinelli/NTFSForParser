@@ -281,5 +281,17 @@
     "\n  [+] Dispositivos de Bloque Detectados (Abrir con 'open /dev/XXX'):": "\n  [+] Block Devices Detected (Open with 'open /dev/XXX'):",
     "    No se detectaron dispositivos (Falta el comando 'lsblk').": "    No devices detected ('lsblk' command missing).",
     "\n[!] Nota: Para abrir dispositivos físicos directos se requieren privilegios de Administrador (Windows) o Root (Linux).": "\n[!] Note: Admin privileges (Windows) or Root (Linux) are required to open raw physical devices.",
-    "Abre y monta una imagen forense (.dd, .raw, .001, .e01) o disco físico. Uso: open <ruta_imagen>\n        Si se ejecuta sin argumentos o con '--list', muestra los dispositivos físicos/lógicos del host.\n        ": "Open and mount a forensic image (.dd, .raw, .001, .e01) or physical disk. Usage: open <image_path>\n        If run without arguments or with '--list', lists the physical/logical devices of the host.\n        "
+    "Abre y monta una imagen forense (.dd, .raw, .001, .e01) o disco físico. Uso: open <ruta_imagen>\n        Si se ejecuta sin argumentos o con '--list', muestra los dispositivos físicos/lógicos del host.\n        ": "Open and mount a forensic image (.dd, .raw, .001, .e01) or physical disk. Usage: open <image_path>\n        If run without arguments or with '--list', lists the physical/logical devices of the host.\n        ",
+    "Muestra una distribución visual (mapa de caracteres en colores) de los clústeres del volumen.\n        Uso: clustermap\n        ": "Display a visual layout (colorized character map) of the volume's clusters.\n        Usage: clustermap\n        ",
+    "\n==================================================================================": "\n==================================================================================",
+    "  DISTRIBUCIÓN VISUAL DE CLÚSTERES (Volumen {fs})": "  VISUAL CLUSTER LAYOUT (Volume {fs})",
+    "  Cada bloque representa: {num} clústeres ({size_kb:.1f} KB)": "  Each block represents: {num} clusters ({size_kb:.1f} KB)",
+    "\n  Mapa del Volumen:": "\n  Volume Map:",
+    "\n  [+] LEYENDA DEL MAPA DE CLÚSTERES:": "\n  [+] CLUSTER MAP LEGEND:",
+    "Sectores Críticos del Sistema (MFT / FAT)": "System Critical Sectores (MFT / FAT)",
+    "Rango Completamente Asignado (100% Usado)": "Fully Allocated Block (100% Used)",
+    "Rango Mayormente Asignado (>50% Usado)": "Mostly Allocated Block (>50% Used)",
+    "Rango Parcialmente Asignado (10% - 50% Usado)": "Partially Allocated Block (10% - 50% Used)",
+    "Rango con Asignación Mínima (<10% Usado)": "Minimally Allocated Block (<10% Used)",
+    "Rango Totalmente Libre (Unallocated)": "Unallocated Block (100% Free)"
 }

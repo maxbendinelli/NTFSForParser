@@ -609,10 +609,37 @@ def verify_all_filesystems():
     assert "Discos Físicos" in devlist_out or "Dispositivos de Bloque" in devlist_out
     print("    [OK] Listado de dispositivos del host validado correctamente.")
 
+    # ------------------ 20. TEST DE CLUSTERMAP (DISTRIBUCIÓN VISUAL) ------------------
+    print("\n[+] 20. Validando Comando 'clustermap' (Distribución Visual)...")
+    shell_map = NTFSShell(source, MBRParser(source))
+    
+    sys.stdout = io.StringIO()
+    try:
+        shell_map.do_clustermap("")
+        map_no_sel_out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    assert "No hay ninguna partición seleccionada" in map_no_sel_out
+    
+    shell_map.do_select("4") # NTFS
+    sys.stdout = io.StringIO()
+    try:
+        shell_map.do_clustermap("")
+        map_out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+        
+    print("       Salida de clustermap en test:")
+    print("\n".join("         " + line for line in map_out.strip().split("\n")[:25] if line))
+    assert "DISTRIBUCIÓN VISUAL DE CLÚSTERES" in map_out
+    assert "Mapa del Volumen" in map_out
+    assert "LEYENDA" in map_out
+    print("    [OK] Distribución visual de clústeres validada correctamente.")
+
     # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER, HISTORIAL, DISKINFO, PARTITIONS EXPLICATIVO, VBRINFO Y LISTADO DE DISPOSITIVOS SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER, HISTORIAL, DISKINFO, PARTITIONS EXPLICATIVO, VBRINFO, LISTADO DE DISPOSITIVOS Y MAPA DE CLÚSTERES SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()
