@@ -271,5 +271,15 @@
     "Tamaño volumen": "Volume size",
     "Apunta al inicio físico de la Master File Table": "Points to the physical start of the Master File Table",
     "Firma de arranque de sector válida (0x55AA).": "Valid boot sector signature (0x55AA).",
-    "Firma de arranque de sector válida (0x55AA).": "Valid boot sector signature (0x55AA)."
+    "Firma de arranque de sector válida (0x55AA).": "Valid boot sector signature (0x55AA).",
+    "\n==================================================================================": "\n==================================================================================",
+    "  DISPOSITIVOS DE ALMACENAMIENTO DISPONIBLES EN EL HOST": "  STORAGE DEVICES AVAILABLE ON HOST",
+    "\n  [+] Discos Físicos (Abrir con 'open \\\\.\\PhysicalDriveX'):": "\n  [+] Physical Drives (Open with 'open \\\\.\\PhysicalDriveX'):",
+    "    No se detectaron discos físicos.": "    No physical drives detected.",
+    "\n  [+] Unidades Lógicas (Abrir con 'open \\\\.\\X:'):": "\n  [+] Logical Drives (Open with 'open \\\\.\\X:'):",
+    "    No se detectaron unidades lógicas.": "    No logical drives detected.",
+    "\n  [+] Dispositivos de Bloque Detectados (Abrir con 'open /dev/XXX'):": "\n  [+] Block Devices Detected (Open with 'open /dev/XXX'):",
+    "    No se detectaron dispositivos (Falta el comando 'lsblk').": "    No devices detected ('lsblk' command missing).",
+    "\n[!] Nota: Para abrir dispositivos físicos directos se requieren privilegios de Administrador (Windows) o Root (Linux).": "\n[!] Note: Admin privileges (Windows) or Root (Linux) are required to open raw physical devices.",
+    "Abre y monta una imagen forense (.dd, .raw, .001, .e01) o disco físico. Uso: open <ruta_imagen>\n        Si se ejecuta sin argumentos o con '--list', muestra los dispositivos físicos/lógicos del host.\n        ": "Open and mount a forensic image (.dd, .raw, .001, .e01) or physical disk. Usage: open <image_path>\n        If run without arguments or with '--list', lists the physical/logical devices of the host.\n        "
 }

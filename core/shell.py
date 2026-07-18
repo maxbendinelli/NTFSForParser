@@ -519,15 +519,121 @@ class NTFSShell(cmd.Cmd):
         print(f"\n  - Offset 0x1fe (Firma de Sector)    : {sig_color}{vbr_data[510:512].hex().upper()}\033[0m -> {_('Firma de arranque de sector válida (0x55AA).') if vbr_data[510:512] == b'\\x55\\xaa' else _('Firma de arranque inválida.')}")
         print("==================================================================================\n")
 
+    def _list_available_devices(self):
+        """Lista los dispositivos físicos y unidades lógicas disponibles en el host actual (Windows o Linux)."""
+        import sys
+        import subprocess
+        import json
+        
+        print(_("\n=================================================================================="))
+        print(_("  DISPOSITIVOS DE ALMACENAMIENTO DISPONIBLES EN EL HOST"))
+        print(_("=================================================================================="))
+        
+        if sys.platform == "win32":
+            physical_drives = []
+            logical_drives = []
+            
+            # 1. Discos Físicos
+            try:
+                cmd = 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance -ClassName Win32_DiskDrive | Select-Object DeviceID, Model, Size | ConvertTo-Json"'
+                res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=3)
+                if res.returncode == 0 and res.stdout.strip():
+                    data = json.loads(res.stdout)
+                    items = data if isinstance(data, list) else [data]
+                    for item in items:
+                        if item:
+                            dev_id = item.get("DeviceID", "")
+                            model = item.get("Model", "Desconocido")
+                            size = item.get("Size", 0)
+                            physical_drives.append((dev_id, model, int(size) if size else 0))
+            except Exception:
+                pass
+                
+            # Fallback simple si no hay resultados en discos físicos
+            if not physical_drives:
+                for idx in range(8):
+                    path = f"\\\\.\\PhysicalDrive{idx}"
+                    try:
+                        with open(path, "rb"):
+                            physical_drives.append((path, f"Physical Drive {idx}", 0))
+                    except (PermissionError, OSError):
+                        physical_drives.append((path, f"Physical Drive {idx}", 0))
+                    except FileNotFoundError:
+                        break
+                        
+            # 2. Unidades Lógicas
+            try:
+                cmd = 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance -ClassName Win32_LogicalDisk | Select-Object DeviceID, VolumeName, Size | ConvertTo-Json"'
+                res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=3)
+                if res.returncode == 0 and res.stdout.strip():
+                    data = json.loads(res.stdout)
+                    items = data if isinstance(data, list) else [data]
+                    for item in items:
+                        if item:
+                            dev_id = item.get("DeviceID", "")
+                            label = item.get("VolumeName", "")
+                            size = item.get("Size", 0)
+                            logical_drives.append((f"\\\\.\\{dev_id}", f"Unidad {dev_id} ({label or 'Sin Etiqueta'})", int(size) if size else 0))
+            except Exception:
+                pass
+                
+            # Imprimir Discos Físicos
+            print(_("\n  [+] Discos Físicos (Abrir con 'open \\\\.\\PhysicalDriveX'):"))
+            if physical_drives:
+                for path, model, size in physical_drives:
+                    size_gb = size / (1024**3) if size else 0
+                    size_str = f"({size_gb:.2f} GB)" if size else ""
+                    print(f"    - {path:<22} | {model} {size_str}")
+            else:
+                print(_("    No se detectaron discos físicos."))
+                
+            # Imprimir Unidades Lógicas
+            print(_("\n  [+] Unidades Lógicas (Abrir con 'open \\\\.\\X:'):"))
+            if logical_drives:
+                for path, name, size in logical_drives:
+                    size_gb = size / (1024**3) if size else 0
+                    size_str = f"({size_gb:.2f} GB)" if size else ""
+                    print(f"    - {path:<22} | {name} {size_str}")
+            else:
+                print(_("    No se detectaron unidades lógicas."))
+                
+        else: # Linux / macOS
+            devices = []
+            try:
+                res = subprocess.run(['lsblk', '--json', '-o', 'NAME,MODEL,SIZE,TYPE'], capture_output=True, text=True, timeout=3)
+                if res.returncode == 0 and res.stdout.strip():
+                    data = json.loads(res.stdout)
+                    block_devices = data.get("blockdevices", [])
+                    for dev in block_devices:
+                        name = dev.get("name", "")
+                        model = dev.get("model") or "Dispositivo de bloque"
+                        size = dev.get("size", "Desconocido")
+                        dev_type = dev.get("type", "disk")
+                        devices.append((f"/dev/{name}", f"{model} ({dev_type})", size))
+            except Exception:
+                pass
+                
+            print(_("\n  [+] Dispositivos de Bloque Detectados (Abrir con 'open /dev/XXX'):"))
+            if devices:
+                for path, model, size in devices:
+                    print(f"    - {path:<22} | {model} ({size})")
+            else:
+                print(_("    No se detectaron dispositivos (Falta el comando 'lsblk')."))
+                
+        print(_("\n[!] Nota: Para abrir dispositivos físicos directos se requieren privilegios de Administrador (Windows) o Root (Linux)."))
+        print("==================================================================================\n")
+
     def do_open(self, arg):
-        """Abre y monta una imagen forense (.dd, .raw, .001, .e01) o disco físico. Uso: open <ruta_imagen>"""
+        """Abre y monta una imagen forense (.dd, .raw, .001, .e01) o disco físico. Uso: open <ruta_imagen>
+        Si se ejecuta sin argumentos o con '--list', muestra los dispositivos físicos/lógicos del host.
+        """
         if arg.strip() in ('?', '-h', '--help'):
             print(_(self.do_open.__doc__))
             return
             
         image_path = arg.strip()
-        if not image_path:
-            print(_("Uso: open <ruta_imagen>"))
+        if not image_path or image_path in ('--list', '-l'):
+            self._list_available_devices()
             return
             
         import os

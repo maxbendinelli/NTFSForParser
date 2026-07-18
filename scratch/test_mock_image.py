@@ -592,10 +592,27 @@ def verify_all_filesystems():
     
     print("    [OK] Desglose didáctico de VBR de volúmenes validado correctamente.")
 
+    # ------------------ 19. TEST DE LISTADO DE DISPOSITIVOS DEL HOST ------------------
+    print("\n[+] 19. Validando Listado de Dispositivos del Host (Comando 'open' sin argumentos)...")
+    shell_devlist = NTFSShell(None, None)
+    
+    sys.stdout = io.StringIO()
+    try:
+        shell_devlist.do_open("")
+        devlist_out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+        
+    print("       Salida de listado de dispositivos en test:")
+    print("\n".join("         " + line for line in devlist_out.strip().split("\n")[:20] if line))
+    assert "DISPOSITIVOS DE ALMACENAMIENTO" in devlist_out
+    assert "Discos Físicos" in devlist_out or "Dispositivos de Bloque" in devlist_out
+    print("    [OK] Listado de dispositivos del host validado correctamente.")
+
     # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER, HISTORIAL, DISKINFO, PARTITIONS EXPLICATIVO Y VBRINFO SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER, HISTORIAL, DISKINFO, PARTITIONS EXPLICATIVO, VBRINFO Y LISTADO DE DISPOSITIVOS SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()
