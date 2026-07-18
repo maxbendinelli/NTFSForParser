@@ -155,17 +155,39 @@ class ForensicGui:
         self.disk_blocks_render_info = []
         colors = ["#2a82e6", "#e67e22", "#27ae60", "#9b59b6", "#16a085", "#f1c40f"]
         
+        sum_sectors = sum((b["end"] - b["start"] + 1) for b in blocks)
+        num_blocks = len(blocks)
+        
+        min_width = 45
+        reserved_width = num_blocks * min_width
+        
+        if reserved_width > canvas_width:
+            min_width = canvas_width // num_blocks
+            reserved_width = num_blocks * min_width
+            
+        remaining_width = canvas_width - reserved_width
+        
+        current_x = 0
         for block in blocks:
-            x1 = (block["start"] / total_sectors) * canvas_width
-            x2 = (block["end"] / total_sectors) * canvas_width
-            x1 = max(0, x1)
-            x2 = min(canvas_width, x2)
-            if x2 - x1 < 2:
-                x2 = x1 + 2
+            size = block["end"] - block["start"] + 1
+            if sum_sectors > 0:
+                block_w = min_width + (size / sum_sectors) * remaining_width
+            else:
+                block_w = canvas_width / num_blocks
                 
+            x1 = current_x
+            x2 = current_x + block_w
+            x2 = min(canvas_width, x2)
+            
+            # Asegurar que el último bloque llegue al final
+            if block == blocks[-1]:
+                x2 = canvas_width
+                
+            current_x = x2
+            
             if block["type"] == "unallocated":
                 color = "#444444"
-                label = f"Libre ({block['end'] - block['start'] + 1} sectores)"
+                label = f"Libre ({block['end'] - block['start'] + 1} sect.)"
             else:
                 color_idx = block["part_idx"] % len(colors)
                 color = colors[color_idx]
@@ -177,7 +199,7 @@ class ForensicGui:
             rect_id = self.disk_canvas.create_rectangle(x1, 5, x2, 55, fill=color, outline=border_color, width=width_border)
             
             # Dibujar etiqueta de texto en el rectángulo
-            if x2 - x1 > 80:
+            if x2 - x1 > 60:
                 self.disk_canvas.create_text((x1 + x2)/2, 30, text=label, fill="#ffffff", font=("Helvetica", 8, "bold"))
                 
             self.disk_blocks_render_info.append({
@@ -215,24 +237,37 @@ class ForensicGui:
         fat_start = -1
         
         vbr_data = self.data_source.read(part.start_offset, 512)
+        sb_data = self.data_source.read(part.start_offset + 1024, 64)
         
-        if b"NTFS" in vbr_data[3:11]:
-            fs_type = "NTFS"
-            bytes_per_cluster = struct.unpack('<H', vbr_data[11:13])[0] * vbr_data[13]
-            mft_start = struct.unpack('<Q', vbr_data[48:56])[0]
-        elif b"EXFAT" in vbr_data[3:11]:
+        if len(vbr_data) >= 11 and vbr_data[3:11] == b'-FVE-FS-':
+            fs_type = "BitLocker (Cifrado)"
+        elif len(vbr_data) >= 11 and vbr_data[3:11] == b'EXFAT   ':
             fs_type = "exFAT"
-            bytes_per_cluster = (2**vbr_data[108]) * (2**vbr_data[109])
-            fat_start = struct.unpack('<I', vbr_data[80:84])[0]
-        elif vbr_data[510:512] == b"\x55\xaa":
-            if b"FAT32" in vbr_data[82:90] or b"FAT32" in vbr_data[54:62]:
-                fs_type = "FAT32"
+            if len(vbr_data) >= 112:
+                bytes_per_cluster = (2**vbr_data[108]) * (2**vbr_data[109])
+                fat_start = struct.unpack('<I', vbr_data[80:84])[0]
+        elif len(vbr_data) >= 11 and vbr_data[3:11] == b'NTFS    ':
+            fs_type = "NTFS"
+            if len(vbr_data) >= 56:
                 bytes_per_cluster = struct.unpack('<H', vbr_data[11:13])[0] * vbr_data[13]
-                fat_start = struct.unpack('<H', vbr_data[14:16])[0]
-            else:
-                fs_type = "FAT16/12"
-                bytes_per_cluster = struct.unpack('<H', vbr_data[11:13])[0] * vbr_data[13]
-                fat_start = struct.unpack('<H', vbr_data[14:16])[0]
+                mft_start = struct.unpack('<Q', vbr_data[48:56])[0]
+        elif len(sb_data) >= 58 and sb_data[56:58] == b'\x53\xef':
+            fs_type = "Ext4"
+        elif len(vbr_data) >= 512 and vbr_data[510:512] == b'\x55\xaa':
+            try:
+                bytes_sec = struct.unpack('<H', vbr_data[11:13])[0]
+                sec_clust = vbr_data[13]
+                if bytes_sec in (512, 1024, 2048, 4096) and sec_clust in (1, 2, 4, 8, 16, 32, 64, 128):
+                    fat_sz16 = struct.unpack('<H', vbr_data[22:24])[0]
+                    if fat_sz16 == 0:
+                        fs_type = "FAT32"
+                        fat_start = struct.unpack('<I', vbr_data[36:40])[0]
+                    else:
+                        fs_type = "FAT16/12"
+                        fat_start = struct.unpack('<H', vbr_data[14:16])[0]
+                    bytes_per_cluster = bytes_sec * sec_clust
+            except Exception:
+                pass
                 
         total_clusters = part.size_in_bytes // bytes_per_cluster
         if total_clusters <= 0:
@@ -304,7 +339,9 @@ class ForensicGui:
                 else:
                     bitmap[i] = (random.randint(0, 100) < 30)
                     
-        if fs_type == "DESCONOCIDO":
+        if fs_type == "BitLocker (Cifrado)":
+            self.lbl_warning.config(text="⚠️ Advertencia: Partición cifrada con BitLocker. Los datos lógicos están protegidos y no es posible parsear clústeres. Mostrando simulación didáctica.")
+        elif fs_type == "DESCONOCIDO":
             self.lbl_warning.config(text="⚠️ Advertencia: Partición sin sistema de archivos compatible. Mostrando simulación didáctica de ocupación.")
         elif not has_real_data:
             self.lbl_warning.config(text="⚠️ Nota: No se pudo leer el bitmap. Mostrando simulación didáctica.")
