@@ -652,7 +652,17 @@ class ForensicGui:
                 )
                 self.txt_hexdump.insert("1.0", explanation)
             else:
-                self.txt_hexdump.insert("1.0", f"[Partición seleccionada. Tipo de sistema de archivos: {fs_type}]")
+                try:
+                    vbr_bytes = self.data_source.read(part.start_offset, 512)
+                    vbr_dump = self._hexdump_formatter(vbr_bytes)
+                    header = (
+                        f"================================================================================\n"
+                        f"        VOLCADO HEXADECIMAL DEL SECTOR DE ARRANQUE (VBR) - {fs_type}\n"
+                        f"================================================================================\n\n"
+                    )
+                    self.txt_hexdump.insert("1.0", header + vbr_dump)
+                except Exception as e:
+                    self.txt_hexdump.insert("1.0", f"[Error al leer sector de arranque: {e}]")
 
     def _hexdump_formatter(self, data):
         lines = []
