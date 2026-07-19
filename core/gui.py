@@ -666,6 +666,7 @@ class ForensicGui:
             self.lbl_file_meta.config(text=f"ID Lógico: {meta['id']}\nCreación: {meta['created']}\nModificación: {meta['modified']}")
             
             parser, fs_type, _ = self._get_volume_parser(node_info["part_idx"])
+            dir_bytes = b""
             
             if "NTFS" in fs_type:
                 try:
@@ -677,6 +678,7 @@ class ForensicGui:
                         f"================================================================================\n\n"
                     )
                     self.txt_raw_metadata.insert("1.0", header + v_dump)
+                    dir_bytes = record.raw_data
                 except:
                     pass
             elif "FAT" in fs_type:
@@ -690,6 +692,19 @@ class ForensicGui:
                             f"================================================================================\n\n"
                         )
                         self.txt_raw_metadata.insert("1.0", header + v_dump)
+                        
+                    start_clust = meta["id"]
+                    if start_clust > 0:
+                        chain = parser.get_fat_chain(start_clust)
+                        buffer = bytearray()
+                        for c in chain[:8]: # Leer hasta 8 clústeres
+                            offset = parser.get_cluster_offset(c)
+                            buffer.extend(self.data_source.read(offset, parser.get_cluster_size()))
+                        dir_bytes = bytes(buffer)
+                    elif start_clust == 0 and hasattr(parser, "get_root_dir_offset"):
+                        root_offset = parser.get_root_dir_offset()
+                        root_size = parser.boot_sector.root_entry_count * 32
+                        dir_bytes = self.data_source.read(root_offset, root_size)
                 except:
                     pass
             elif "Ext4" in fs_type:
@@ -702,8 +717,16 @@ class ForensicGui:
                         f"================================================================================\n\n"
                     )
                     self.txt_raw_metadata.insert("1.0", header + v_dump)
+                    
+                    dir_bytes = parser.read_file(meta["id"])[:4096]
                 except:
                     pass
+                    
+            if dir_bytes:
+                dump_str = self._hexdump_formatter(dir_bytes[:4096])
+                self.txt_hexdump.insert("1.0", dump_str)
+            else:
+                self.txt_hexdump.insert("1.0", "[Sin datos o directorio vacío]")
             
         elif node_info["type"] == "part":
             self.selected_partition = node_info["part_idx"]
