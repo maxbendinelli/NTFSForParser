@@ -146,6 +146,12 @@ class MBRParser:
             elif guid_str == "0FC63DAF-8483-4772-8E79-3D69D8477DE4":
                 type_name = "Linux Filesystem Data"
                 type_code = 0x83 # Ext4
+            elif guid_str == "DE94BBA4-06D1-4D40-A16A-BFD50179D6AC":
+                type_name = "Windows Recovery Partition"
+                type_code = 0x07 # Es NTFS/FAT, forzamos para que sea parseable
+            elif guid_str == "E3C9E316-0B5C-4DB8-817D-F92DF00215AE":
+                type_name = "Microsoft Reserved Partition (MSR)"
+                type_code = 0xFF
             else:
                 type_code = 0xFF # Desconocido/Otro
                 
