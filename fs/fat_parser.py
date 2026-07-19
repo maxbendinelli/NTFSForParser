@@ -273,7 +273,8 @@ class FATParser:
                         attributes=attributes,
                         created=parse_dos_time(c_date, c_time),
                         modified=parse_dos_time(m_date, m_time),
-                        accessed=parse_dos_time(a_date, 0)
+                        accessed=parse_dos_time(a_date, 0),
+                        raw_bytes=entry_bytes
                     ))
             
             idx += 32
@@ -282,7 +283,7 @@ class FATParser:
 
 class FATDirectoryEntry:
     def __init__(self, name: str, is_directory: bool, is_deleted: bool, size: int, start_cluster: int, attributes: int,
-                 created: str = "N/A", modified: str = "N/A", accessed: str = "N/A"):
+                 created: str = "N/A", modified: str = "N/A", accessed: str = "N/A", raw_bytes: bytes = b""):
         self.name = name
         self.is_directory = is_directory
         self.is_deleted = is_deleted
@@ -292,3 +293,4 @@ class FATDirectoryEntry:
         self.created = created
         self.modified = modified
         self.accessed = accessed
+        self.raw_bytes = raw_bytes

@@ -68,6 +68,8 @@ class exFATDirectoryEntry:
         self.modified = "N/A"
         self.accessed = "N/A"
         self.attributes = 0
+        self.raw_bytes = b""
+        self.raw_bytes_list = []
 
 
 class exFATParser:
@@ -191,10 +193,12 @@ class exFATParser:
             if entry_type in (0x85, 0x05):
                 # Si había una entrada previa incompleta, la salvamos
                 if current_entry and current_entry.name:
+                    current_entry.raw_bytes = b"".join(current_entry.raw_bytes_list)
                     entries.append(current_entry)
                     
                 current_entry = exFATDirectoryEntry()
                 current_entry.is_deleted = is_deleted
+                current_entry.raw_bytes_list.append(entry_bytes)
                 
                 # Atributos de archivo
                 current_entry.attributes = struct.unpack('<I', entry_bytes[4:8])[0]
@@ -218,6 +222,7 @@ class exFATParser:
                 
             # 2. Registro STREAM EXTENSION (0xC0 o 0x40 si está borrado)
             elif entry_type in (0xC0, 0x40) and current_entry:
+                current_entry.raw_bytes_list.append(entry_bytes)
                 general_flags = entry_bytes[1]
                 # Bit 0: Allocated, Bit 1: NoFatChain
                 current_entry.no_fat_chain = (general_flags & 0x02) != 0
@@ -229,6 +234,7 @@ class exFATParser:
                 
             # 3. Registro FILE NAME (0xC1 o 0x41 si está borrado)
             elif entry_type in (0xC1, 0x41) and current_entry:
+                current_entry.raw_bytes_list.append(entry_bytes)
                 # El nombre UTF-16LE empieza en el offset 2 y ocupa hasta 30 bytes
                 name_chunk_bytes = entry_bytes[2:32]
                 try:
@@ -241,6 +247,7 @@ class exFATParser:
                 # Si recolectamos todos los nombres esperados, salvamos la entrada
                 if names_collected >= expected_names:
                     if current_entry.name:
+                        current_entry.raw_bytes = b"".join(current_entry.raw_bytes_list)
                         entries.append(current_entry)
                     current_entry = None
             
@@ -249,6 +256,7 @@ class exFATParser:
             
         # Salvar entrada residual si existe
         if current_entry and current_entry.name:
+            current_entry.raw_bytes = b"".join(current_entry.raw_bytes_list)
             entries.append(current_entry)
             
         return entries

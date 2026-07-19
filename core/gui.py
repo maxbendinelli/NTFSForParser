@@ -115,15 +115,31 @@ class ForensicGui:
         self.lbl_file_meta.pack(anchor="w", pady=3)
         
         # Panel inferior de Hexdump
-        self.hex_frame = ttk.LabelFrame(right_frame, text=" Vista Previa / Hexdump Forense ", padding=10)
+        self.hex_frame = ttk.LabelFrame(right_frame, text=" Visores Forenses de Previsualización ", padding=10)
         self.hex_frame.pack(fill="both", expand=True)
         
-        self.txt_hexdump = tk.Text(self.hex_frame, font=("Courier New", 9), bg="#1e1e1e", fg="#55ff55", insertbackground="white", highlightthickness=0)
-        self.txt_hexdump.pack(fill="both", expand=True, side="left")
+        self.preview_notebook = ttk.Notebook(self.hex_frame)
+        self.preview_notebook.pack(fill="both", expand=True)
         
-        scroll_hex = ttk.Scrollbar(self.hex_frame, orient="vertical", command=self.txt_hexdump.yview)
+        # Pestaña A: Contenido / Datos
+        tab_content = ttk.Frame(self.preview_notebook)
+        self.preview_notebook.add(tab_content, text=" Contenido (Datos) ")
+        
+        self.txt_hexdump = tk.Text(tab_content, font=("Courier New", 9), bg="#1e1e1e", fg="#55ff55", insertbackground="white", highlightthickness=0)
+        self.txt_hexdump.pack(fill="both", expand=True, side="left")
+        scroll_hex = ttk.Scrollbar(tab_content, orient="vertical", command=self.txt_hexdump.yview)
         scroll_hex.pack(fill="y", side="right")
         self.txt_hexdump.configure(yscrollcommand=scroll_hex.set)
+        
+        # Pestaña B: Registro de Sistema de Archivos (Crudo / Estructura)
+        tab_structure = ttk.Frame(self.preview_notebook)
+        self.preview_notebook.add(tab_structure, text=" Registro de Sistema (Metadatos Crudos) ")
+        
+        self.txt_raw_metadata = tk.Text(tab_structure, font=("Courier New", 9), bg="#1e1e1e", fg="#55ffff", insertbackground="white", highlightthickness=0)
+        self.txt_raw_metadata.pack(fill="both", expand=True, side="left")
+        scroll_raw = ttk.Scrollbar(tab_structure, orient="vertical", command=self.txt_raw_metadata.yview)
+        scroll_raw.pack(fill="y", side="right")
+        self.txt_raw_metadata.configure(yscrollcommand=scroll_raw.set)
         
     def _create_clusters_widgets(self):
         # Panel izquierdo para Canvas de Clústeres
@@ -490,7 +506,8 @@ class ForensicGui:
                         "created": entry.created if entry.created else "N/A",
                         "modified": entry.modified if entry.modified else "N/A",
                         "accessed": entry.accessed if entry.accessed else "N/A",
-                        "entry_obj": entry
+                        "entry_obj": entry,
+                        "raw_bytes": getattr(entry, "raw_bytes", b"")
                     })
             except Exception:
                 pass
@@ -555,6 +572,7 @@ class ForensicGui:
             return
             
         self.txt_hexdump.delete("1.0", tk.END)
+        self.txt_raw_metadata.delete("1.0", tk.END)
         self.lbl_file_name.config(text="Ningún archivo seleccionado")
         self.lbl_file_meta.config(text="")
         
@@ -573,7 +591,7 @@ class ForensicGui:
             )
             self.lbl_file_meta.config(text=metadata_text)
             
-            # Cargar vista previa del archivo
+            # Cargar vista previa del archivo y metadatos crudos
             parser, fs_type, _ = self._get_volume_parser(node_info["part_idx"])
             file_bytes = b""
             
@@ -583,6 +601,16 @@ class ForensicGui:
                         file_bytes = meta.get("content", b"")
                     else:
                         file_bytes = parser.read_data_runs(meta.get("data_runs", []), min(meta["size"], 4096))
+                        
+                    # Cargar registro MFT crudo
+                    record = parser.get_mft_record(meta["id"])
+                    v_dump = self._hexdump_formatter(record.raw_data)
+                    header = (
+                        f"================================================================================\n"
+                        f"        REGISTRO MFT {meta['id']} EN CRUDO (NTFS) - {len(record.raw_data)} BYTES\n"
+                        f"================================================================================\n\n"
+                    )
+                    self.txt_raw_metadata.insert("1.0", header + v_dump)
                 except:
                     pass
             elif "FAT" in fs_type:
@@ -596,6 +624,32 @@ class ForensicGui:
                             offset = parser.get_cluster_offset(c)
                             buffer.extend(self.data_source.read(offset, parser.get_cluster_size()))
                         file_bytes = bytes(buffer[:meta["size"]])
+                        
+                    # Cargar Directory Entry cruda
+                    raw_b = meta.get("raw_bytes", b"")
+                    if raw_b:
+                        v_dump = self._hexdump_formatter(raw_b)
+                        header = (
+                            f"================================================================================\n"
+                            f"        DIRECTORY ENTRY EN CRUDO ({fs_type}) - {len(raw_b)} BYTES\n"
+                            f"================================================================================\n\n"
+                        )
+                        self.txt_raw_metadata.insert("1.0", header + v_dump)
+                except:
+                    pass
+            elif "Ext4" in fs_type:
+                try:
+                    file_bytes = parser.read_file(meta["id"])[:4096]
+                    
+                    # Cargar Inodo crudo
+                    inode_bytes = parser.get_inode(meta["id"])
+                    v_dump = self._hexdump_formatter(inode_bytes)
+                    header = (
+                        f"================================================================================\n"
+                        f"        ESTRUCTURA DE INODO {meta['id']} EN CRUDO (Ext4) - {len(inode_bytes)} BYTES\n"
+                        f"================================================================================\n\n"
+                    )
+                    self.txt_raw_metadata.insert("1.0", header + v_dump)
                 except:
                     pass
                     
@@ -610,6 +664,46 @@ class ForensicGui:
             meta = node_info["meta"]
             self.lbl_file_name.config(text=f"Directorio: {meta['name']}")
             self.lbl_file_meta.config(text=f"ID Lógico: {meta['id']}\nCreación: {meta['created']}\nModificación: {meta['modified']}")
+            
+            parser, fs_type, _ = self._get_volume_parser(node_info["part_idx"])
+            
+            if "NTFS" in fs_type:
+                try:
+                    record = parser.get_mft_record(meta["id"])
+                    v_dump = self._hexdump_formatter(record.raw_data)
+                    header = (
+                        f"================================================================================\n"
+                        f"        REGISTRO MFT {meta['id']} EN CRUDO (NTFS) - {len(record.raw_data)} BYTES\n"
+                        f"================================================================================\n\n"
+                    )
+                    self.txt_raw_metadata.insert("1.0", header + v_dump)
+                except:
+                    pass
+            elif "FAT" in fs_type:
+                try:
+                    raw_b = meta.get("raw_bytes", b"")
+                    if raw_b:
+                        v_dump = self._hexdump_formatter(raw_b)
+                        header = (
+                            f"================================================================================\n"
+                            f"        DIRECTORY ENTRY EN CRUDO ({fs_type}) - {len(raw_b)} BYTES\n"
+                            f"================================================================================\n\n"
+                        )
+                        self.txt_raw_metadata.insert("1.0", header + v_dump)
+                except:
+                    pass
+            elif "Ext4" in fs_type:
+                try:
+                    inode_bytes = parser.get_inode(meta["id"])
+                    v_dump = self._hexdump_formatter(inode_bytes)
+                    header = (
+                        f"================================================================================\n"
+                        f"        ESTRUCTURA DE INODO {meta['id']} EN CRUDO (Ext4) - {len(inode_bytes)} BYTES\n"
+                        f"================================================================================\n\n"
+                    )
+                    self.txt_raw_metadata.insert("1.0", header + v_dump)
+                except:
+                    pass
             
         elif node_info["type"] == "part":
             self.selected_partition = node_info["part_idx"]
