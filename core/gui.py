@@ -683,13 +683,26 @@ class ForensicGui:
                 bytes_per_cluster = parser.vbr.bytes_per_cluster
                 total_clusters = part.size_in_bytes // bytes_per_cluster
                 mft_start = parser.vbr.mft_start_cluster
-            elif "FAT" in fs_type:
-                bytes_per_cluster = parser.bytes_per_cluster
+            elif "FAT" in fs_type or "exFAT" in fs_type:
+                if hasattr(parser, "get_cluster_size"):
+                    bytes_per_cluster = parser.get_cluster_size()
+                elif hasattr(parser, "bytes_per_cluster"):
+                    bytes_per_cluster = parser.bytes_per_cluster
+                elif hasattr(parser, "boot_sector") and hasattr(parser.boot_sector, "sectors_per_cluster") and hasattr(parser.boot_sector, "bytes_per_sector"):
+                    bytes_per_cluster = parser.boot_sector.sectors_per_cluster * parser.boot_sector.bytes_per_sector
+                else:
+                    bytes_per_cluster = 4096
                 total_clusters = part.size_in_bytes // bytes_per_cluster
                 if hasattr(parser, "vbr"):
                     vbr = parser.vbr
                     if hasattr(vbr, "reserved_sectors"):
                         fat_start = vbr.reserved_sectors
+            elif "Ext" in fs_type:
+                if hasattr(parser, "superblock") and hasattr(parser.superblock, "block_size"):
+                    bytes_per_cluster = parser.superblock.block_size
+                else:
+                    bytes_per_cluster = 4096
+                total_clusters = part.size_in_bytes // bytes_per_cluster
                         
         total_clusters = max(1, total_clusters)
         self.lbl_fs.config(text=f"Sistema de archivos: {fs_type}")
