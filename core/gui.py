@@ -71,9 +71,9 @@ class ForensicGui:
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill="both", expand=True, padx=15, pady=10)
         
-        # Pestaña 1: Explorador de Archivos (Autopsy Style)
+        # Pestaña 1: Explorador de Archivos
         self.tab_explorer = ttk.Frame(self.notebook)
-        self.notebook.add(self.tab_explorer, text=" Explorador Forense (Autopsy Style) ")
+        self.notebook.add(self.tab_explorer, text=" Explorador Forense ")
         self._create_explorer_widgets()
         
         # Pestaña 2: Mapa de Clústeres (Defragmenter Style)
@@ -643,7 +643,7 @@ class ForensicGui:
                     "2. Para descifrar las estructuras del filesystem se requiere el uso de la clave de\n"
                     "   recuperación de 48 dígitos (Recovery Password) o un archivo de clave de inicio (.bek)\n"
                     "   para descifrar la clave maestra del volumen (VMK) y luego la clave del volumen (FVEK).\n"
-                    "3. Autopsy logra descifrar este tipo de volúmenes cuando el analista le proporciona dicha\n"
+                    "3. Las herramientas forenses logran descifrar este tipo de volúmenes cuando el analista proporciona dicha\n"
                     "   clave o si detecta que el volumen se encuentra temporalmente 'suspendido' (Clear Key),\n"
                     "   permitiéndole reconstruir el sistema de archivos NTFS en caliente en memoria virtual.\n\n"
                     "Acciones forenses posibles sin descifrado en este framework:\n"
