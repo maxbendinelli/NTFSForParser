@@ -141,6 +141,16 @@ class ForensicGui:
         scroll_raw.pack(fill="y", side="right")
         self.txt_raw_metadata.configure(yscrollcommand=scroll_raw.set)
         
+        # Pestaña C: Vista de Texto (ASCII/ANSI continuo)
+        tab_text_view = ttk.Frame(self.preview_notebook)
+        self.preview_notebook.add(tab_text_view, text=" Vista de Texto ")
+        
+        self.txt_text_view = tk.Text(tab_text_view, font=("Courier New", 9), bg="#1e1e1e", fg="#ffffff", insertbackground="white", highlightthickness=0, wrap="char")
+        self.txt_text_view.pack(fill="both", expand=True, side="left")
+        scroll_text_view = ttk.Scrollbar(tab_text_view, orient="vertical", command=self.txt_text_view.yview)
+        scroll_text_view.pack(fill="y", side="right")
+        self.txt_text_view.configure(yscrollcommand=scroll_text_view.set)
+        
         # Barra de estado inferior estilo Autopsy
         self.lbl_hex_status = ttk.Label(self.hex_frame, text="Cursor pos = 0; clus = N/A; log sec = N/A; phy sec = N/A", font=("Courier New", 9, "bold"), relief="sunken", anchor="w", padding=3)
         self.lbl_hex_status.pack(fill="x", side="bottom", pady=(5, 0))
@@ -150,6 +160,8 @@ class ForensicGui:
         self.txt_hexdump.bind("<ButtonRelease-1>", self._update_hex_cursor_status)
         self.txt_raw_metadata.bind("<KeyRelease>", self._update_hex_cursor_status)
         self.txt_raw_metadata.bind("<ButtonRelease-1>", self._update_hex_cursor_status)
+        self.txt_text_view.bind("<KeyRelease>", self._update_hex_cursor_status)
+        self.txt_text_view.bind("<ButtonRelease-1>", self._update_hex_cursor_status)
         
     def _create_clusters_widgets(self):
         # Panel izquierdo para Canvas de Clústeres
@@ -583,6 +595,7 @@ class ForensicGui:
             
         self.txt_hexdump.delete("1.0", tk.END)
         self.txt_raw_metadata.delete("1.0", tk.END)
+        self.txt_text_view.delete("1.0", tk.END)
         self.lbl_file_name.config(text="Ningún archivo seleccionado")
         self.lbl_file_meta.config(text="")
         
@@ -664,11 +677,14 @@ class ForensicGui:
                     pass
                     
             if file_bytes:
-                # Mostrar Hexdump
+                # Mostrar Hexdump y Vista de Texto
                 dump_str = self._hexdump_formatter(file_bytes[:512])
                 self.txt_hexdump.insert("1.0", dump_str)
+                text_str = self._text_formatter(file_bytes[:4096])
+                self.txt_text_view.insert("1.0", text_str)
             else:
                 self.txt_hexdump.insert("1.0", "[Sin datos o archivo residente vacío / cifrado]")
+                self.txt_text_view.insert("1.0", "[Sin datos]")
                 
         elif node_info["type"] == "dir":
             meta = node_info["meta"]
@@ -735,8 +751,11 @@ class ForensicGui:
             if dir_bytes:
                 dump_str = self._hexdump_formatter(dir_bytes[:4096])
                 self.txt_hexdump.insert("1.0", dump_str)
+                text_str = self._text_formatter(dir_bytes[:4096])
+                self.txt_text_view.insert("1.0", text_str)
             else:
                 self.txt_hexdump.insert("1.0", "[Sin datos o directorio vacío]")
+                self.txt_text_view.insert("1.0", "[Sin datos]")
             
         elif node_info["type"] == "part":
             self.selected_partition = node_info["part_idx"]
@@ -778,6 +797,7 @@ class ForensicGui:
                     "- Realizar análisis crudo de sectores usando 'hexdump' o 'sector'."
                 )
                 self.txt_hexdump.insert("1.0", explanation)
+                self.txt_text_view.insert("1.0", "[Cifrado]")
             else:
                 try:
                     vbr_bytes = self.data_source.read(part.start_offset, 512)
@@ -788,8 +808,11 @@ class ForensicGui:
                         f"================================================================================\n\n"
                     )
                     self.txt_hexdump.insert("1.0", header + vbr_dump)
+                    vbr_text = self._text_formatter(vbr_bytes)
+                    self.txt_text_view.insert("1.0", vbr_text)
                 except Exception as e:
                     self.txt_hexdump.insert("1.0", f"[Error al leer sector de arranque: {e}]")
+                    self.txt_text_view.insert("1.0", f"[Error: {e}]")
             
         self._update_hex_cursor_status()
 
@@ -798,7 +821,7 @@ class ForensicGui:
         for i in range(0, len(data), 16):
             chunk = data[i:i+16]
             hex_part = " ".join(f"{b:02x}" for b in chunk)
-            ascii_part = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
+            ascii_part = "".join(chr(b) if (32 <= b < 127) or (160 <= b < 256) else "." for b in chunk)
             lines.append(f"{i:04x} | {hex_part:<47} | {ascii_part}")
         return "\n".join(lines)
 
@@ -976,31 +999,35 @@ class ForensicGui:
             return
             
         try:
-            insert_pos = txt_widget.index("insert")
-            line_num, col_num = map(int, insert_pos.split("."))
-            line_text = txt_widget.get(f"{line_num}.0", f"{line_num}.end")
-            
-            # Intentar parsear el offset hexadecimal del inicio de la línea
-            parts = line_text.split("|")
-            if not parts or not parts[0].strip():
-                return
+            if txt_widget == self.txt_text_view:
+                byte_offset = len(txt_widget.get("1.0", "insert"))
+                line_text = ""
+            else:
+                insert_pos = txt_widget.index("insert")
+                line_num, col_num = map(int, insert_pos.split("."))
+                line_text = txt_widget.get(f"{line_num}.0", f"{line_num}.end")
                 
-            try:
-                base_offset = int(parts[0].strip(), 16)
-            except ValueError:
-                return
-                
-            # Calcular el byte relativo dentro de la línea
-            byte_in_line = 0
-            if len(parts) > 1:
-                pipe_idx = line_text.find("|")
-                if pipe_idx != -1 and col_num > pipe_idx:
-                    relative_col = col_num - (pipe_idx + 1)
-                    calculated_idx = relative_col // 3
-                    if 0 <= calculated_idx < 16:
-                        byte_in_line = calculated_idx
-                        
-            byte_offset = base_offset + byte_in_line
+                # Intentar parsear el offset hexadecimal del inicio de la línea
+                parts = line_text.split("|")
+                if not parts or not parts[0].strip():
+                    return
+                    
+                try:
+                    base_offset = int(parts[0].strip(), 16)
+                except ValueError:
+                    return
+                    
+                # Calcular el byte relativo dentro de la línea
+                byte_in_line = 0
+                if len(parts) > 1:
+                    pipe_idx = line_text.find("|")
+                    if pipe_idx != -1 and col_num > pipe_idx:
+                        relative_col = col_num - (pipe_idx + 1)
+                        calculated_idx = relative_col // 3
+                        if 0 <= calculated_idx < 16:
+                            byte_in_line = calculated_idx
+                            
+                byte_offset = base_offset + byte_in_line
         except Exception:
             return
             
@@ -1120,6 +1147,15 @@ class ForensicGui:
         self.lbl_hex_status.config(
             text=f"Cursor pos = {byte_offset}; clus = {clus}; log sec = {log_sec}; phy sec = {phy_sec}"
         )
+
+    def _text_formatter(self, data):
+        chars = []
+        for b in data:
+            if (32 <= b < 127) or (160 <= b < 256):
+                chars.append(chr(b))
+            else:
+                chars.append(".")
+        return "".join(chars)
 
     def run(self):
         self.root.mainloop()
