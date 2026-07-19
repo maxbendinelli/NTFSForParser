@@ -141,6 +141,16 @@ class ForensicGui:
         scroll_raw.pack(fill="y", side="right")
         self.txt_raw_metadata.configure(yscrollcommand=scroll_raw.set)
         
+        # Barra de estado inferior estilo Autopsy
+        self.lbl_hex_status = ttk.Label(self.hex_frame, text="Cursor pos = 0; clus = N/A; log sec = N/A; phy sec = N/A", font=("Courier New", 9, "bold"), relief="sunken", anchor="w", padding=3)
+        self.lbl_hex_status.pack(fill="x", side="bottom", pady=(5, 0))
+        
+        # Eventos para actualizar la posición en tiempo real
+        self.txt_hexdump.bind("<KeyRelease>", self._update_hex_cursor_status)
+        self.txt_hexdump.bind("<ButtonRelease-1>", self._update_hex_cursor_status)
+        self.txt_raw_metadata.bind("<KeyRelease>", self._update_hex_cursor_status)
+        self.txt_raw_metadata.bind("<ButtonRelease-1>", self._update_hex_cursor_status)
+        
     def _create_clusters_widgets(self):
         # Panel izquierdo para Canvas de Clústeres
         map_frame = ttk.LabelFrame(self.tab_clusters, text=" Cuadrícula de Clústeres del Volumen ", padding=10)
@@ -780,6 +790,8 @@ class ForensicGui:
                     self.txt_hexdump.insert("1.0", header + vbr_dump)
                 except Exception as e:
                     self.txt_hexdump.insert("1.0", f"[Error al leer sector de arranque: {e}]")
+            
+        self._update_hex_cursor_status()
 
     def _hexdump_formatter(self, data):
         lines = []
@@ -951,6 +963,163 @@ class ForensicGui:
                 x2 = x1 + block_w - 1
                 y2 = y1 + block_h - 1
                 self.cluster_canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="#222222", width=1)
+
+    def _update_hex_cursor_status(self, event=None):
+        if self.selected_partition is None or not self.mbr_parser:
+            return
+            
+        part = self.mbr_parser.partitions[self.selected_partition]
+        parser, fs_type, _ = self._get_volume_parser(self.selected_partition)
+        
+        txt_widget = event.widget if event else self.txt_hexdump
+        if not txt_widget:
+            return
+            
+        try:
+            insert_pos = txt_widget.index("insert")
+            line_num, col_num = map(int, insert_pos.split("."))
+            line_text = txt_widget.get(f"{line_num}.0", f"{line_num}.end")
+            
+            # Intentar parsear el offset hexadecimal del inicio de la línea
+            parts = line_text.split("|")
+            if not parts or not parts[0].strip():
+                return
+                
+            try:
+                base_offset = int(parts[0].strip(), 16)
+            except ValueError:
+                return
+                
+            # Calcular el byte relativo dentro de la línea
+            byte_in_line = 0
+            if len(parts) > 1:
+                pipe_idx = line_text.find("|")
+                if pipe_idx != -1 and col_num > pipe_idx:
+                    relative_col = col_num - (pipe_idx + 1)
+                    calculated_idx = relative_col // 3
+                    if 0 <= calculated_idx < 16:
+                        byte_in_line = calculated_idx
+                        
+            byte_offset = base_offset + byte_in_line
+        except Exception:
+            return
+            
+        is_raw_tab = (txt_widget == self.txt_raw_metadata)
+        
+        clus = "N/A"
+        log_sec = "N/A"
+        phy_sec = "N/A"
+        
+        node_id = self.tree.focus()
+        node_info = self.tree_nodes.get(node_id) if node_id else None
+        
+        if not node_info or node_info["type"] == "part" or "SECTOR DE ARRANQUE" in line_text or "VOLCADO HEXADECIMAL DEL SECTOR DE ARRANQUE" in line_text or "VBR" in line_text:
+            log_sec = byte_offset // 512
+            phy_sec = part.start_lba + log_sec
+            clus = "VBR" if log_sec == 0 else "N/A"
+        else:
+            meta = node_info["meta"]
+            
+            if is_raw_tab:
+                if "NTFS" in fs_type:
+                    try:
+                        mft_start_offset = part.start_offset + (parser.vbr.mft_start_cluster * parser.vbr.bytes_per_cluster)
+                        record_offset = mft_start_offset + (meta["id"] * 1024) + byte_offset
+                        phy_sec = record_offset // 512
+                        log_sec = (record_offset - part.start_offset) // 512
+                        clus = record_offset // parser.vbr.bytes_per_cluster
+                    except:
+                        pass
+                elif "FAT" in fs_type:
+                    # Direccionar la Directory Entry dentro del directorio padre
+                    try:
+                        parent_id = node_info.get("parent_id", 0)
+                        start_clust = parent_id
+                        # Estimar posición si está disponible la cadena del directorio padre
+                        if start_clust > 0:
+                            chain = parser.get_fat_chain(start_clust)
+                            bytes_per_cluster = parser.get_cluster_size()
+                            # Como aproximación didáctica, mapear al inicio del directorio padre
+                            if chain:
+                                phy_offset = parser.get_cluster_offset(chain[0]) + byte_offset
+                                phy_sec = phy_offset // 512
+                                log_sec = (phy_offset - part.start_offset) // 512
+                                clus = chain[0]
+                        elif start_clust == 0 and hasattr(parser, "get_root_dir_offset"):
+                            root_offset = parser.get_root_dir_offset()
+                            phy_offset = root_offset + byte_offset
+                            phy_sec = phy_offset // 512
+                            log_sec = (phy_offset - part.start_offset) // 512
+                            clus = 0
+                    except:
+                        pass
+            else:
+                if "FAT" in fs_type:
+                    try:
+                        start_clust = meta["id"]
+                        if start_clust > 0:
+                            chain = parser.get_fat_chain(start_clust)
+                            bytes_per_cluster = parser.get_cluster_size()
+                            cluster_index = byte_offset // bytes_per_cluster
+                            if cluster_index < len(chain):
+                                clus = chain[cluster_index]
+                                cluster_offset = byte_offset % bytes_per_cluster
+                                phy_offset = parser.get_cluster_offset(clus) + cluster_offset
+                                phy_sec = phy_offset // 512
+                                log_sec = (phy_offset - part.start_offset) // 512
+                        elif start_clust == 0 and hasattr(parser, "get_root_dir_offset"):
+                            root_offset = parser.get_root_dir_offset()
+                            phy_offset = root_offset + byte_offset
+                            phy_sec = phy_offset // 512
+                            log_sec = (phy_offset - part.start_offset) // 512
+                            clus = 0
+                    except:
+                        pass
+                elif "NTFS" in fs_type:
+                    try:
+                        if not meta.get("is_resident", True) or "data_runs" in meta:
+                            chain = []
+                            for run in meta.get("data_runs", []):
+                                start_lcn = run[1]
+                                length = run[0]
+                                for offset in range(length):
+                                    chain.append(start_lcn + offset)
+                            bytes_per_cluster = parser.vbr.bytes_per_cluster
+                            cluster_index = byte_offset // bytes_per_cluster
+                            if cluster_index < len(chain):
+                                clus = chain[cluster_index]
+                                cluster_offset = byte_offset % bytes_per_cluster
+                                phy_offset = part.start_offset + (clus * bytes_per_cluster) + cluster_offset
+                                phy_sec = phy_offset // 512
+                                log_sec = (phy_offset - part.start_offset) // 512
+                        else:
+                            mft_start_offset = part.start_offset + (parser.vbr.mft_start_cluster * parser.vbr.bytes_per_cluster)
+                            record_offset = mft_start_offset + (meta["id"] * 1024)
+                            phy_offset = record_offset + 150 + byte_offset
+                            phy_sec = phy_offset // 512
+                            log_sec = (phy_offset - part.start_offset) // 512
+                            clus = phy_offset // parser.vbr.bytes_per_cluster
+                    except:
+                        pass
+                elif "Ext4" in fs_type:
+                    try:
+                        inode_bytes = parser.get_inode(meta["id"])
+                        blocks = parser.get_inode_data_blocks(inode_bytes)
+                        block_size = parser.superblock.block_size
+                        block_index = byte_offset // block_size
+                        if block_index < len(blocks):
+                            blk = blocks[block_index]
+                            block_offset = byte_offset % block_size
+                            phy_offset = part.start_offset + (blk * block_size) + block_offset
+                            phy_sec = phy_offset // 512
+                            log_sec = (phy_offset - part.start_offset) // 512
+                            clus = blk
+                    except:
+                        pass
+                        
+        self.lbl_hex_status.config(
+            text=f"Cursor pos = {byte_offset}; clus = {clus}; log sec = {log_sec}; phy sec = {phy_sec}"
+        )
 
     def run(self):
         self.root.mainloop()
