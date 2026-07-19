@@ -656,10 +656,28 @@ def verify_all_filesystems():
     gui_inst.root.destroy()
     print("    [OK] Estructura e instanciación de ForensicGui validadas correctamente.")
 
+    # ------------------ 22. TEST DE OPEN -V (VERBOSE FORENSE) ------------------
+    print("\n[+] 22. Validando Comando 'open -v' (Verbose Forense)...")
+    shell_open_v = NTFSShell(None, None)
+    sys.stdout = io.StringIO()
+    try:
+        shell_open_v.do_open(f"{image_path} -v")
+        open_v_out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+        
+    print("       Salida de open -v en test:")
+    print("\n".join("         " + line for line in open_v_out.strip().split("\n")[:25] if line))
+    assert "ANÁLISIS EXPLICATIVO DE APERTURA FORENSE" in open_v_out
+    assert "Paso 1: Análisis del formato" in open_v_out
+    assert "Paso 2: Análisis del LBA 0" in open_v_out
+    assert "Paso 3: Análisis del GPT Header" in open_v_out
+    print("    [OK] Apertura forense detallada (open -v) validada correctamente.")
+
     # Limpieza final
     source.close()
     
-    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER, HISTORIAL, DISKINFO, PARTITIONS EXPLICATIVO, VBRINFO, LISTADO DE DISPOSITIVOS, MAPA DE CLÚSTERES Y GUI SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
+    print("\n[OK] ¡TODAS LAS PARTICIONES, ARCHIVOS, CARVING, RECOVERY, CONFIGURACIONES, AUTOCOMPLETADO, AYUDA GENERAL, TRADUCCIONES, APERTURA, BITLOCKER, HISTORIAL, DISKINFO, PARTITIONS EXPLICATIVO, VBRINFO, LISTADO DE DISPOSITIVOS, MAPA DE CLÚSTERES, GUI Y APERTURA VERBOSA SE VALIDARON CORRECTAMENTE EN LA IMAGEN!")
 
 if __name__ == "__main__":
     verify_all_filesystems()

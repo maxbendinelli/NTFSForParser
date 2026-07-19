@@ -837,7 +837,16 @@ class NTFSShell(cmd.Cmd):
             print(_(self.do_open.__doc__))
             return
             
-        image_path = arg.strip()
+        args = arg.strip().split()
+        verbose = False
+        if '-v' in args:
+            verbose = True
+            args.remove('-v')
+        if '--verbose' in args:
+            verbose = True
+            args.remove('--verbose')
+            
+        image_path = " ".join(args).strip()
         if not image_path or image_path in ('--list', '-l'):
             self._list_available_devices()
             return
@@ -845,6 +854,7 @@ class NTFSShell(cmd.Cmd):
         import os
         import re
         import sys
+        import struct
         
         # Si es una letra de unidad en Windows (ej: f: o F: o f:\ o F:\)
         if sys.platform == "win32" and re.match(r'^[a-zA-Z]:\\?$', image_path):
@@ -886,6 +896,121 @@ class NTFSShell(cmd.Cmd):
             
             print(_("    Tamaño total: {size:.2f} GB").format(size=data_source.get_size() / (1024**3)))
             print(_("    Se encontraron {count} particiones.").format(count=len(self.mbr_parser.partitions)))
+            
+            if verbose:
+                print("\n==================================================================================")
+                print(_("  ANÁLISIS EXPLICATIVO DE APERTURA FORENSE (Verbose Mode)"))
+                print("==================================================================================")
+                
+                # Paso 1: Analizar cabecera del contenedor
+                print(_("\n[+] Paso 1: Análisis del formato del archivo contenedor / dispositivo"))
+                try:
+                    # Leer del archivo real directo para la firma física si existe
+                    if os.path.exists(image_path):
+                        with open(image_path, 'rb') as f:
+                            header_sample = f.read(16)
+                    else:
+                        header_sample = data_source.read(0, 16)
+                except Exception:
+                    header_sample = data_source.read(0, 16)
+                
+                hex_str = " ".join(f"{b:02x}" for b in header_sample)
+                ascii_str = "".join(chr(b) if 32 <= b < 127 else "." for b in header_sample)
+                print(_("  Firma física inicial (primeros 16 bytes):"))
+                print(f"  Offset    | Hexadecimal                                     | ASCII")
+                print(f"  ---------------------------------------------------------------------------")
+                print(f"  0x00       | {hex_str:<47} | {ascii_str}")
+                
+                if image_path.lower().endswith('.e01') or header_sample.startswith(b'EVF\x09\x0d\x0a\xff\x00'):
+                    print(_("  - \033[92m[i] Firma E01 (Expert Witness Format) válida detectada.\033[0m"))
+                    print(_("    Los primeros bytes corresponden a la firma del formato E01 de EnCase: 'EVF\\x09\\x0d\\x0a\\xff\\x00'."))
+                else:
+                    print(_("  - \033[96m[i] Formato de flujo crudo (RAW/DD/PhysicalDrive) detectado.\033[0m"))
+                
+                # Paso 2: Análisis del Sector 0 (MBR)
+                print(_("\n[+] Paso 2: Análisis del LBA 0 (Master Boot Record / Protective MBR)"))
+                sect0 = data_source.read(0, 512)
+                
+                print(_("  Volcado hexadecimal de LBA 0 (primeros 64 bytes):"))
+                print(f"  Offset    | Hexadecimal                                     | ASCII")
+                print(f"  ---------------------------------------------------------------------------")
+                for offset in range(0, 64, 16):
+                    line_bytes = sect0[offset : offset + 16]
+                    h_str = " ".join(f"{b:02x}" for b in line_bytes)
+                    a_str = "".join(chr(b) if 32 <= b < 127 else "." for b in line_bytes)
+                    print(f"  0x{offset:02x}       | {h_str:<47} | {a_str}")
+                    
+                print(_("\n  Volcado de la Tabla de Particiones en MBR (Offset 0x1BE - 0x1FD):"))
+                print(f"  Offset    | Hexadecimal                                     | ASCII")
+                print(f"  ---------------------------------------------------------------------------")
+                mbr_table = sect0[0x1be : 0x1be + 64]
+                for offset in range(0, 64, 16):
+                    line_bytes = mbr_table[offset : offset + 16]
+                    h_str = " ".join(f"{b:02x}" for b in line_bytes)
+                    a_str = "".join(chr(b) if 32 <= b < 127 else "." for b in line_bytes)
+                    print(f"  0x{0x1be + offset:03x}      | {h_str:<47} | {a_str}")
+                    
+                sig_val = sect0[510:512].hex().upper()
+                print(f"\n  - Offset 0x1FE (Firma de Sector): \033[92m{sig_val}\033[0m -> " + 
+                      (_("Firma de arranque válida (0x55AA).") if sect0[510:512] == b'\x55\xaa' else _("Firma de arranque inválida.")))
+                      
+                is_gpt_protective = False
+                for i in range(4):
+                    entry_offset = 0x1be + (i * 16)
+                    part_type = sect0[entry_offset + 4]
+                    if part_type == 0xEE:
+                        is_gpt_protective = True
+                        break
+                        
+                if is_gpt_protective:
+                    print(_("  - \033[93m[i] Protective MBR Detectado (Tipo de partición: 0xEE).\033[0m"))
+                    print(_("    Esto indica que el disco utiliza el esquema de particionado GPT (GUID Partition Table)."))
+                    print(_("    La entrada del MBR protector evita que herramientas antiguas vean el disco como vacío y lo destruyan."))
+                    
+                    # Paso 3: GPT Header en LBA 1
+                    print(_("\n[+] Paso 3: Análisis del GPT Header (LBA 1)"))
+                    sect1 = data_source.read(512, 512)
+                    
+                    print(_("  Volcado hexadecimal del GPT Header (LBA 1, primeros 96 bytes):"))
+                    print(f"  Offset    | Hexadecimal                                     | ASCII")
+                    print(f"  ---------------------------------------------------------------------------")
+                    for offset in range(0, 96, 16):
+                        line_bytes = sect1[offset : offset + 16]
+                        h_str = " ".join(f"{b:02x}" for b in line_bytes)
+                        a_str = "".join(chr(b) if 32 <= b < 127 else "." for b in line_bytes)
+                        print(f"  0x{offset:02x}       | {h_str:<47} | {a_str}")
+                        
+                    sig = sect1[0:8].decode('ascii', errors='ignore')
+                    print(_("\n  Desglose del GPT Header (LBA 1):"))
+                    print(f"    - Offset 0x00 (Firma EFI PART) : \033[92m{sig}\033[0m")
+                    
+                    lba_self = struct.unpack('<Q', sect1[24:32])[0]
+                    lba_backup = struct.unpack('<Q', sect1[32:40])[0]
+                    first_usable = struct.unpack('<Q', sect1[40:48])[0]
+                    last_usable = struct.unpack('<Q', sect1[48:56])[0]
+                    partition_entry_lba = struct.unpack('<Q', sect1[72:80])[0]
+                    num_partition_entries = struct.unpack('<I', sect1[80:84])[0]
+                    size_partition_entry = struct.unpack('<I', sect1[84:88])[0]
+                    
+                    print(f"    - Offset 0x18 (LBA de este Header) : {lba_self}")
+                    print(f"    - Offset 0x20 (LBA del Backup Header) : {lba_backup}")
+                    print(f"    - Offset 0x28 (Primer LBA utilizable): {first_usable}")
+                    print(f"    - Offset 0x30 (Último LBA utilizable): {last_usable}")
+                    print(f"    - Offset 0x48 (LBA de Entradas GPT)   : \033[96m{partition_entry_lba}\033[0m (Típicamente LBA 2)")
+                    print(f"    - Offset 0x50 (Cantidad de Entradas)  : {num_partition_entries} registros máximos.")
+                    print(f"    - Offset 0x54 (Tamaño de cada Entrada): {size_partition_entry} bytes.")
+                    
+                    # Paso 4: Array de particiones GPT
+                    print(f"\n[+] Paso 4: Lectura secuencial de las Entradas de Partición GPT (LBA {partition_entry_lba} en adelante)")
+                    print(_("    Cada entrada de partición GPT tiene un tamaño de {size} bytes.").format(size=size_partition_entry))
+                    print(_("    Se mapean las entradas activas y se traduce su Unique Partition GUID para determinar su tipo."))
+                else:
+                    print(_("  - \033[92m[i] Esquema MBR Clásico Detectado\033[0m."))
+                    print(_("    El disco utiliza particionado antiguo. Se decodifican los 4 registros del MBR en LBA 0."))
+                    print(_("    - Offset de inicio LBA (4 bytes) y tamaño de sectores (4 bytes) de cada entrada en la tabla."))
+                    
+                print("==================================================================================\n")
+            
             self.update_prompt()
             
             # Listar particiones automáticamente
