@@ -21,7 +21,7 @@ class ForensicGui:
         self.active_parsers = {} # Cache de parsers cargados en caliente por partición
         
         self.root = tk.Tk()
-        self.root.title("Framework Educativo Forense - Autopsy & Cluster Analyzer")
+        self.root.title("Framework Educativo Forense - Cluster Analyzer")
         self.root.geometry("1100x750")
         self.root.configure(bg="#1e1e1e")
         
@@ -617,6 +617,42 @@ class ForensicGui:
                 self.on_partition_select(node_info["part_idx"])
             self._load_cluster_map()
             self._load_disk_layout()
+            
+            part = self.mbr_parser.partitions[self.selected_partition]
+            parser, fs_type, _ = self._get_volume_parser(self.selected_partition)
+            
+            self.lbl_file_name.config(text=f"Partición [{self.selected_partition}]: {part.type_name}")
+            
+            meta_text = (
+                f"LBA de inicio : {part.start_lba}\n"
+                f"LBA de fin    : {part.start_lba + part.size_in_sectors - 1}\n"
+                f"Tamaño total  : {part.size_in_bytes / (1024**3):.2f} GB ({part.size_in_bytes} bytes)\n"
+                f"Filesystem    : {fs_type}"
+            )
+            self.lbl_file_meta.config(text=meta_text)
+            
+            if fs_type == "BitLocker (Cifrado)":
+                explanation = (
+                    "================================================================================\n"
+                    "        EXPLICACIÓN FORENSE DE VOLUMEN CIFRADO (BitLocker Full Volume Encryption)\n"
+                    "================================================================================\n\n"
+                    "Este volumen está cifrado y protegido mediante cifrado de disco completo de Windows.\n\n"
+                    "¿Por qué no podemos listar sus directorios ni archivos en este framework didáctico?\n"
+                    "1. La Master File Table (MFT) de NTFS y todos los bloques de datos lógicos del volumen\n"
+                    "   están encriptados mediante algoritmos simétricos robustos (como AES-CBC o AES-XTS).\n"
+                    "2. Para descifrar las estructuras del filesystem se requiere el uso de la clave de\n"
+                    "   recuperación de 48 dígitos (Recovery Password) o un archivo de clave de inicio (.bek)\n"
+                    "   para descifrar la clave maestra del volumen (VMK) y luego la clave del volumen (FVEK).\n"
+                    "3. Autopsy logra descifrar este tipo de volúmenes cuando el analista le proporciona dicha\n"
+                    "   clave o si detecta que el volumen se encuentra temporalmente 'suspendido' (Clear Key),\n"
+                    "   permitiéndole reconstruir el sistema de archivos NTFS en caliente en memoria virtual.\n\n"
+                    "Acciones forenses posibles sin descifrado en este framework:\n"
+                    "- Ejecutar File Carving ('carve') sobre la partición buscando firmas físicas directamente.\n"
+                    "- Realizar análisis crudo de sectores usando 'hexdump' o 'sector'."
+                )
+                self.txt_hexdump.insert("1.0", explanation)
+            else:
+                self.txt_hexdump.insert("1.0", f"[Partición seleccionada. Tipo de sistema de archivos: {fs_type}]")
 
     def _hexdump_formatter(self, data):
         lines = []
