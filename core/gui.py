@@ -68,6 +68,7 @@ class ForensicGui:
         self.disk_canvas = tk.Canvas(disk_frame, height=60, bg="#ffffff", highlightthickness=1, highlightbackground="#dadce0")
         self.disk_canvas.pack(fill="x", pady=5)
         self.disk_canvas.bind("<Button-1>", self._on_disk_canvas_click)
+        self.disk_canvas.bind("<Configure>", self._on_disk_canvas_resize)
         
         # 3. Notebook de Pestañas
         self.notebook = ttk.Notebook(self.root)
@@ -395,6 +396,13 @@ class ForensicGui:
                             self.tree.see(node_id)
                             break
                 break
+
+    def _on_disk_canvas_resize(self, event):
+        if hasattr(self, "_last_disk_canvas_width"):
+            if abs(self._last_disk_canvas_width - event.width) < 5:
+                return
+        self._last_disk_canvas_width = event.width
+        self._load_disk_layout()
 
     def _load_data_source_tree(self):
         self.tree.delete(*self.tree.get_children())
