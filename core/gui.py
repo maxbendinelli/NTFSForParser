@@ -170,9 +170,13 @@ class ForensicGui:
         self.txt_text_view.bind("<ButtonRelease-1>", self._update_hex_cursor_status)
         
     def _create_clusters_widgets(self):
+        # PanedWindow horizontal para permitir ajustar dinámicamente el canvas y la inspección
+        paned_clusters = ttk.PanedWindow(self.tab_clusters, orient="horizontal")
+        paned_clusters.pack(fill="both", expand=True, padx=5, pady=5)
+        
         # Panel izquierdo para Canvas de Clústeres
-        map_frame = ttk.LabelFrame(self.tab_clusters, text=" Cuadrícula de Clústeres del Volumen ", padding=5)
-        map_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        map_frame = ttk.LabelFrame(paned_clusters, text=" Cuadrícula de Clústeres del Volumen ", padding=5)
+        paned_clusters.add(map_frame, weight=1)
         
         # Canvas con Barras de Desplazamiento Vertical y Horizontal
         canvas_container = ttk.Frame(map_frame)
@@ -192,10 +196,9 @@ class ForensicGui:
         self.cluster_canvas.bind("<Configure>", self._on_cluster_canvas_resize)
         self.cluster_canvas.bind("<Button-1>", self._on_cluster_canvas_click_block)
         
-        # Panel derecho para estadísticas, leyenda e inspección de clústeres
-        stats_frame = ttk.LabelFrame(self.tab_clusters, text=" Detalles e Inspección de Clúster ", padding=10, width=360)
-        stats_frame.pack(side="right", fill="both", padx=5, pady=5)
-        stats_frame.pack_propagate(False)
+        # Panel derecho para estadísticas, leyenda e inspección de clústeres (Ancho amplio para Hexdump: 560px)
+        stats_frame = ttk.LabelFrame(paned_clusters, text=" Detalles e Inspección de Clúster ", padding=10, width=560)
+        paned_clusters.add(stats_frame, weight=1)
         
         self.lbl_part_name = ttk.Label(stats_frame, text="Selecciona una partición...", style="Stat.TLabel")
         self.lbl_part_name.pack(anchor="w", pady=2)
@@ -218,7 +221,7 @@ class ForensicGui:
         self.lbl_free_clusters = ttk.Label(stats_frame, text="Clústeres libres: N/A")
         self.lbl_free_clusters.pack(anchor="w", pady=2)
         
-        self.lbl_warning = ttk.Label(stats_frame, text="", wraplength=330, foreground="#ffaa00", font=("Helvetica", 8, "italic"))
+        self.lbl_warning = ttk.Label(stats_frame, text="", wraplength=520, foreground="#ffaa00", font=("Helvetica", 8, "italic"))
         self.lbl_warning.pack(anchor="w", pady=4)
         
         # Panel de Inspección de Clúster Clickeado
@@ -230,7 +233,7 @@ class ForensicGui:
             text="Haz clic en cualquier bloque de la cuadrícula para inspeccionar sus offsets y contenido en tiempo real.",
             font=("Helvetica", 8),
             justify="left",
-            wraplength=330
+            wraplength=520
         )
         self.lbl_cluster_inspect.pack(anchor="w", pady=(0, 4))
         
@@ -243,7 +246,7 @@ class ForensicGui:
             highlightthickness=1,
             highlightbackground="#dadce0",
             wrap="none",
-            height=10
+            height=12
         )
         scroll_hex_c = ttk.Scrollbar(inspect_frame, orient="vertical", command=self.txt_cluster_hex.yview)
         scroll_hex_c_x = ttk.Scrollbar(inspect_frame, orient="horizontal", command=self.txt_cluster_hex.xview)
@@ -930,10 +933,12 @@ class ForensicGui:
                 else:
                     bytes_per_cluster = 4096
                 total_clusters = part.size_in_bytes // bytes_per_cluster
-                if hasattr(parser, "vbr"):
-                    vbr = parser.vbr
-                    if hasattr(vbr, "reserved_sectors"):
-                        fat_start = vbr.reserved_sectors
+                if hasattr(parser, "boot_sector") and hasattr(parser.boot_sector, "reserved_sectors"):
+                    fat_start = parser.boot_sector.reserved_sectors
+                elif hasattr(parser, "vbr") and hasattr(parser.vbr, "reserved_sectors"):
+                    fat_start = parser.vbr.reserved_sectors
+                else:
+                    fat_start = 32
             elif "Ext" in fs_type:
                 if hasattr(parser, "superblock") and hasattr(parser.superblock, "block_size"):
                     bytes_per_cluster = parser.superblock.block_size
@@ -1070,10 +1075,30 @@ class ForensicGui:
             
             is_system = False
             if "NTFS" in fs_type and mft_start != -1:
-                if start_c <= mft_start < end_c or (start_c <= mft_start + 32 < end_c):
+                if start_c <= mft_start < end_c or (start_c <= mft_start + 32 < end_c) or start_c < 16:
                     is_system = True
-            elif "FAT" in fs_type and fat_start != -1:
-                if start_c < 10:
+            elif "FAT" in fs_type:
+                parser, _, _ = self._get_volume_parser(self.selected_partition) if self.selected_partition is not None else (None, "", None)
+                root_c = 2
+                if parser and hasattr(parser, "boot_sector") and hasattr(parser.boot_sector, "root_cluster"):
+                    root_c = parser.boot_sector.root_cluster
+                
+                sec_per_c = 8
+                if parser and hasattr(parser, "boot_sector") and hasattr(parser.boot_sector, "sectors_per_cluster"):
+                    sec_per_c = parser.boot_sector.sectors_per_cluster
+                    
+                num_fats = 2
+                if parser and hasattr(parser, "boot_sector") and hasattr(parser.boot_sector, "num_fats"):
+                    num_fats = parser.boot_sector.num_fats
+                    
+                sec_fat = 300
+                if parser and hasattr(parser, "boot_sector") and hasattr(parser.boot_sector, "sectors_per_fat"):
+                    sec_fat = parser.boot_sector.sectors_per_fat
+                    
+                res_sec = fat_start if fat_start != -1 else 32
+                system_clusters = max(2, (res_sec + (num_fats * sec_fat)) // max(1, sec_per_c))
+                
+                if start_c < system_clusters or (start_c <= root_c < end_c):
                     is_system = True
                     
             if is_system:
