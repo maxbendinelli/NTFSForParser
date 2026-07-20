@@ -171,11 +171,25 @@ class ForensicGui:
         
     def _create_clusters_widgets(self):
         # Panel izquierdo para Canvas de Clústeres
-        map_frame = ttk.LabelFrame(self.tab_clusters, text=" Cuadrícula de Clústeres del Volumen ", padding=10)
+        map_frame = ttk.LabelFrame(self.tab_clusters, text=" Cuadrícula de Clústeres del Volumen ", padding=5)
         map_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         
-        self.cluster_canvas = tk.Canvas(map_frame, bg="#ffffff", highlightthickness=1, highlightbackground="#dadce0")
-        self.cluster_canvas.pack(fill="both", expand=True)
+        # Canvas con Barras de Desplazamiento Vertical y Horizontal
+        canvas_container = ttk.Frame(map_frame)
+        canvas_container.pack(fill="both", expand=True)
+        
+        self.cluster_canvas = tk.Canvas(canvas_container, bg="#ffffff", highlightthickness=1, highlightbackground="#dadce0")
+        
+        scroll_y_map = ttk.Scrollbar(canvas_container, orient="vertical", command=self.cluster_canvas.yview)
+        scroll_x_map = ttk.Scrollbar(canvas_container, orient="horizontal", command=self.cluster_canvas.xview)
+        
+        self.cluster_canvas.configure(yscrollcommand=scroll_y_map.set, xscrollcommand=scroll_x_map.set)
+        
+        scroll_y_map.pack(side="right", fill="y")
+        scroll_x_map.pack(side="bottom", fill="x")
+        self.cluster_canvas.pack(side="left", fill="both", expand=True)
+        
+        self.cluster_canvas.bind("<Configure>", self._on_cluster_canvas_resize)
         
         # Panel derecho para estadísticas y leyenda
         stats_frame = ttk.LabelFrame(self.tab_clusters, text=" Detalles y Leyenda del Volumen ", padding=10, width=300)
@@ -210,12 +224,12 @@ class ForensicGui:
         legend_frame = ttk.Frame(stats_frame, padding=5)
         legend_frame.pack(fill="x", side="bottom")
         
-        self._add_legend_item(legend_frame, "#ff5555", "Metadatos del Sistema (MFT/FAT)")
-        self._add_legend_item(legend_frame, "#55ff55", "Totalmente Ocupado (100%)")
-        self._add_legend_item(legend_frame, "#55ffff", "Mayormente Ocupado (>50%)")
-        self._add_legend_item(legend_frame, "#5555ff", "Parcialmente Ocupado (10%-50%)")
-        self._add_legend_item(legend_frame, "#888888", "Ocupación Mínima (<10%)")
-        self._add_legend_item(legend_frame, "#3a3a3a", "Totalmente Libre (Unallocated)")
+        self._add_legend_item(legend_frame, "#ea4335", "Metadatos del Sistema (MFT/FAT)")
+        self._add_legend_item(legend_frame, "#34a853", "Totalmente Ocupado (100%)")
+        self._add_legend_item(legend_frame, "#4285f4", "Mayormente Ocupado (>50%)")
+        self._add_legend_item(legend_frame, "#fbbc04", "Parcialmente Ocupado (10%-50%)")
+        self._add_legend_item(legend_frame, "#9aa0a6", "Ocupación Mínima (<10%)")
+        self._add_legend_item(legend_frame, "#ffffff", "Totalmente Libre (Unallocated)")
         
     def _add_legend_item(self, parent, color, text):
         item_frame = ttk.Frame(parent)
@@ -962,58 +976,97 @@ class ForensicGui:
         self.lbl_used_clusters.config(text=f"Clústeres usados: {used_count} ({used_count/total_clusters*100:.1f}%)")
         self.lbl_free_clusters.config(text=f"Clústeres libres: {total_clusters - used_count}")
         
-        self.root.update_idletasks()
-        cw = self.cluster_canvas.winfo_width()
-        ch = self.cluster_canvas.winfo_height()
-        if cw <= 1:
-            cw, ch = 550, 420
+        self.cluster_map_data = {
+            "bitmap": bitmap,
+            "total_clusters": total_clusters,
+            "fs_type": fs_type,
+            "mft_start": mft_start,
+            "fat_start": fat_start
+        }
+        self._draw_cluster_grid()
+
+    def _draw_cluster_grid(self):
+        self.cluster_canvas.delete("all")
+        if not hasattr(self, "cluster_map_data") or not self.cluster_map_data:
+            return
             
-        cols = 40
-        rows = 20
-        grid_size = cols * rows
-        clusters_per_block = max(1, total_clusters // grid_size)
+        data = self.cluster_map_data
+        bitmap = data["bitmap"]
+        total_clusters = data["total_clusters"]
+        fs_type = data["fs_type"]
+        mft_start = data.get("mft_start", -1)
+        fat_start = data.get("fat_start", -1)
         
-        block_w = cw / cols
-        block_h = ch / rows
+        cw = self.cluster_canvas.winfo_width()
+        if cw <= 20:
+            cw = 550
+            
+        # Bloques pequeños cuadrados (12x12 px con padding de 1px)
+        box_size = 12
+        padding = 1
+        step = box_size + padding
         
-        for r in range(rows):
-            for c in range(cols):
-                block_idx = r * cols + c
-                start_c = block_idx * clusters_per_block
-                end_c = min(total_clusters, start_c + clusters_per_block)
+        cols = max(8, int((cw - 15) // step))
+        
+        # Representación fina: intentar renderizar hasta 4,000 bloques individuales
+        target_blocks = min(total_clusters, 4000)
+        clusters_per_block = max(1, total_clusters // target_blocks)
+        num_blocks = (total_clusters + clusters_per_block - 1) // clusters_per_block
+        
+        rows = (num_blocks + cols - 1) // cols
+        
+        total_w = max(cw, cols * step + 15)
+        total_h = rows * step + 15
+        
+        self.cluster_canvas.config(scrollregion=(0, 0, total_w, total_h))
+        
+        for idx in range(num_blocks):
+            r = idx // cols
+            c = idx % cols
+            
+            start_c = idx * clusters_per_block
+            end_c = min(total_clusters, start_c + clusters_per_block)
+            
+            range_bitmap = bitmap[start_c:end_c]
+            if not range_bitmap:
+                continue
                 
-                range_bitmap = bitmap[start_c:end_c]
-                if not range_bitmap:
-                    continue
+            ratio = sum(1 for b in range_bitmap if b) / len(range_bitmap)
+            
+            is_system = False
+            if "NTFS" in fs_type and mft_start != -1:
+                if start_c <= mft_start < end_c or (start_c <= mft_start + 32 < end_c):
+                    is_system = True
+            elif "FAT" in fs_type and fat_start != -1:
+                if start_c < 10:
+                    is_system = True
                     
-                ratio = sum(1 for b in range_bitmap if b) / len(range_bitmap)
+            if is_system:
+                color = "#ea4335" # Rojo metadatos de sistema
+            elif ratio == 1.0:
+                color = "#34a853" # Verde 100% ocupado
+            elif ratio > 0.5:
+                color = "#4285f4" # Azul >50%
+            elif ratio > 0.1:
+                color = "#fbbc04" # Amarillo >10%
+            elif ratio > 0.0:
+                color = "#9aa0a6" # Gris mínimo
+            else:
+                color = "#ffffff" # Blanco libre
                 
-                is_system = False
-                if "NTFS" in fs_type and mft_start != -1:
-                    if start_c <= mft_start < end_c or (start_c <= mft_start + 32 < end_c):
-                        is_system = True
-                elif "FAT" in fs_type and fat_start != -1:
-                    if start_c < 10:
-                        is_system = True
-                        
-                if is_system:
-                    color = "#ff5555"
-                elif ratio == 1.0:
-                    color = "#55ff55"
-                elif ratio > 0.5:
-                    color = "#55ffff"
-                elif ratio > 0.1:
-                    color = "#5555ff"
-                elif ratio > 0.0:
-                    color = "#888888"
-                else:
-                    color = "#3a3a3a"
-                    
-                x1 = c * block_w
-                y1 = r * block_h
-                x2 = x1 + block_w - 1
-                y2 = y1 + block_h - 1
-                self.cluster_canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="#222222", width=1)
+            x1 = 5 + c * step
+            y1 = 5 + r * step
+            x2 = x1 + box_size
+            y2 = y1 + box_size
+            
+            self.cluster_canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="#dadce0", width=1)
+
+    def _on_cluster_canvas_resize(self, event):
+        if hasattr(self, "_last_cluster_canvas_width"):
+            if abs(self._last_cluster_canvas_width - event.width) < 10:
+                return
+        self._last_cluster_canvas_width = event.width
+        self._draw_cluster_grid()
 
     def _update_hex_cursor_status(self, event=None):
         if self.selected_partition is None or not self.mbr_parser:
