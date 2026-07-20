@@ -190,35 +190,68 @@ class ForensicGui:
         self.cluster_canvas.pack(side="left", fill="both", expand=True)
         
         self.cluster_canvas.bind("<Configure>", self._on_cluster_canvas_resize)
+        self.cluster_canvas.bind("<Button-1>", self._on_cluster_canvas_click_block)
         
-        # Panel derecho para estadísticas y leyenda
-        stats_frame = ttk.LabelFrame(self.tab_clusters, text=" Detalles y Leyenda del Volumen ", padding=10, width=300)
-        stats_frame.pack(side="right", fill="y", padx=5, pady=5)
+        # Panel derecho para estadísticas, leyenda e inspección de clústeres
+        stats_frame = ttk.LabelFrame(self.tab_clusters, text=" Detalles e Inspección de Clúster ", padding=10, width=360)
+        stats_frame.pack(side="right", fill="both", padx=5, pady=5)
         stats_frame.pack_propagate(False)
         
         self.lbl_part_name = ttk.Label(stats_frame, text="Selecciona una partición...", style="Stat.TLabel")
-        self.lbl_part_name.pack(anchor="w", pady=5)
+        self.lbl_part_name.pack(anchor="w", pady=2)
         
         self.lbl_fs = ttk.Label(stats_frame, text="Sistema de archivos: N/A")
-        self.lbl_fs.pack(anchor="w", pady=3)
+        self.lbl_fs.pack(anchor="w", pady=2)
         
         self.lbl_start_lba = ttk.Label(stats_frame, text="LBA inicio: N/A")
-        self.lbl_start_lba.pack(anchor="w", pady=3)
+        self.lbl_start_lba.pack(anchor="w", pady=2)
         
         self.lbl_size = ttk.Label(stats_frame, text="Tamaño total: N/A")
-        self.lbl_size.pack(anchor="w", pady=3)
+        self.lbl_size.pack(anchor="w", pady=2)
         
         self.lbl_clusters = ttk.Label(stats_frame, text="Clústeres totales: N/A")
-        self.lbl_clusters.pack(anchor="w", pady=3)
+        self.lbl_clusters.pack(anchor="w", pady=2)
         
         self.lbl_used_clusters = ttk.Label(stats_frame, text="Clústeres usados: N/A")
-        self.lbl_used_clusters.pack(anchor="w", pady=3)
+        self.lbl_used_clusters.pack(anchor="w", pady=2)
         
         self.lbl_free_clusters = ttk.Label(stats_frame, text="Clústeres libres: N/A")
-        self.lbl_free_clusters.pack(anchor="w", pady=3)
+        self.lbl_free_clusters.pack(anchor="w", pady=2)
         
-        self.lbl_warning = ttk.Label(stats_frame, text="", wraplength=270, foreground="#ffaa00", font=("Helvetica", 9, "italic"))
-        self.lbl_warning.pack(anchor="w", pady=10)
+        self.lbl_warning = ttk.Label(stats_frame, text="", wraplength=330, foreground="#ffaa00", font=("Helvetica", 8, "italic"))
+        self.lbl_warning.pack(anchor="w", pady=4)
+        
+        # Panel de Inspección de Clúster Clickeado
+        inspect_frame = ttk.LabelFrame(stats_frame, text=" 🔍 Inspección del Clúster Seleccionado ", padding=5)
+        inspect_frame.pack(fill="both", expand=True, pady=(5, 5))
+        
+        self.lbl_cluster_inspect = ttk.Label(
+            inspect_frame,
+            text="Haz clic en cualquier bloque de la cuadrícula para inspeccionar sus offsets y contenido en tiempo real.",
+            font=("Helvetica", 8),
+            justify="left",
+            wraplength=330
+        )
+        self.lbl_cluster_inspect.pack(anchor="w", pady=(0, 4))
+        
+        self.txt_cluster_hex = tk.Text(
+            inspect_frame,
+            font=("Courier New", 8),
+            bg="#ffffff",
+            fg="#1b5e20",
+            insertbackground="#000000",
+            highlightthickness=1,
+            highlightbackground="#dadce0",
+            wrap="none",
+            height=10
+        )
+        scroll_hex_c = ttk.Scrollbar(inspect_frame, orient="vertical", command=self.txt_cluster_hex.yview)
+        scroll_hex_c_x = ttk.Scrollbar(inspect_frame, orient="horizontal", command=self.txt_cluster_hex.xview)
+        self.txt_cluster_hex.configure(yscrollcommand=scroll_hex_c.set, xscrollcommand=scroll_hex_c_x.set)
+        
+        scroll_hex_c.pack(side="right", fill="y")
+        scroll_hex_c_x.pack(side="bottom", fill="x")
+        self.txt_cluster_hex.pack(fill="both", expand=True)
         
         # Leyenda de colores del mapa de clústeres
         legend_frame = ttk.Frame(stats_frame, padding=5)
@@ -987,6 +1020,8 @@ class ForensicGui:
 
     def _draw_cluster_grid(self):
         self.cluster_canvas.delete("all")
+        self.rendered_cluster_blocks = []
+        
         if not hasattr(self, "cluster_map_data") or not self.cluster_map_data:
             return
             
@@ -1059,7 +1094,16 @@ class ForensicGui:
             x2 = x1 + box_size
             y2 = y1 + box_size
             
-            self.cluster_canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="#dadce0", width=1)
+            rect_id = self.cluster_canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="#dadce0", width=1)
+            self.rendered_cluster_blocks.append({
+                "rect_id": rect_id,
+                "x1": x1,
+                "y1": y1,
+                "x2": x2,
+                "y2": y2,
+                "start_c": start_c,
+                "end_c": end_c
+            })
 
     def _on_cluster_canvas_resize(self, event):
         if hasattr(self, "_last_cluster_canvas_width"):
@@ -1067,6 +1111,65 @@ class ForensicGui:
                 return
         self._last_cluster_canvas_width = event.width
         self._draw_cluster_grid()
+
+    def _on_cluster_canvas_click_block(self, event):
+        cx = self.cluster_canvas.canvasx(event.x)
+        cy = self.cluster_canvas.canvasy(event.y)
+        
+        for item in getattr(self, "rendered_cluster_blocks", []):
+            if item["x1"] <= cx <= item["x2"] and item["y1"] <= cy <= item["y2"]:
+                # Resaltar el rectángulo seleccionado con borde azul grueso
+                self.cluster_canvas.delete("selected_cluster_outline")
+                self.cluster_canvas.create_rectangle(
+                    item["x1"]-1, item["y1"]-1, item["x2"]+1, item["y2"]+1,
+                    outline="#1a73e8", width=2, tags=("selected_cluster_outline",)
+                )
+                self._inspect_cluster(item["start_c"], item["end_c"])
+                break
+
+    def _inspect_cluster(self, start_c, end_c):
+        if self.selected_partition is None or not self.mbr_parser:
+            return
+            
+        part = self.mbr_parser.partitions[self.selected_partition]
+        parser, fs_type, _ = self._get_volume_parser(self.selected_partition)
+        
+        bytes_per_cluster = 4096
+        if parser:
+            if hasattr(parser, "get_cluster_size"):
+                bytes_per_cluster = parser.get_cluster_size()
+            elif hasattr(parser, "vbr") and hasattr(parser.vbr, "bytes_per_cluster"):
+                bytes_per_cluster = parser.vbr.bytes_per_cluster
+            elif hasattr(parser, "superblock") and hasattr(parser.superblock, "block_size"):
+                bytes_per_cluster = parser.superblock.block_size
+                
+        log_offset = start_c * bytes_per_cluster
+        phy_offset = part.start_offset + log_offset
+        log_sec = log_offset // 512
+        phy_sec = phy_offset // 512
+        
+        range_title = f"Clúster Lógico: {start_c}" if end_c == start_c + 1 else f"Clústeres Lógicos: {start_c} - {end_c - 1}"
+        
+        info_str = (
+            f"📍 {range_title}\n"
+            f" • Offset Físico (Disco)   : {phy_offset:,} bytes (0x{phy_offset:X})\n"
+            f" • Sector Físico (LBA)     : Sector {phy_sec:,}\n"
+            f" • Offset Relativo (Volumen): {log_offset:,} bytes (0x{log_offset:X})\n"
+            f" • Sector Lógico (Relativo) : Sector {log_sec:,}\n"
+            f" • Tamaño por Clúster       : {bytes_per_cluster} bytes"
+        )
+        self.lbl_cluster_inspect.config(text=info_str)
+        
+        try:
+            read_size = min(bytes_per_cluster, 4096)
+            raw_data = self.data_source.read(phy_offset, read_size)
+            dump_text = self._hexdump_formatter(raw_data)
+            
+            self.txt_cluster_hex.delete("1.0", tk.END)
+            self.txt_cluster_hex.insert("1.0", dump_text)
+        except Exception as e:
+            self.txt_cluster_hex.delete("1.0", tk.END)
+            self.txt_cluster_hex.insert("1.0", f"[Error al leer clúster: {e}]")
 
     def _update_hex_cursor_status(self, event=None):
         if self.selected_partition is None or not self.mbr_parser:
