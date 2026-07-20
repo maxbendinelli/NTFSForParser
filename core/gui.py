@@ -23,21 +23,23 @@ class ForensicGui:
         self.root = tk.Tk()
         self.root.title("Framework Educativo Forense - Cluster Analyzer")
         self.root.geometry("1100x750")
-        self.root.configure(bg="#1e1e1e")
+        self.root.configure(bg="#f8f9fa")
         
-        # Configurar estilos oscuros y modernos
+        # Configurar estilo Claro / Blanco moderno
         self.style = ttk.Style()
         self.style.theme_use("clam")
-        self.style.configure(".", background="#1e1e1e", foreground="#ffffff")
-        self.style.configure("TLabel", background="#1e1e1e", foreground="#ffffff", font=("Helvetica", 10))
-        self.style.configure("TFrame", background="#1e1e1e")
-        self.style.configure("Header.TLabel", font=("Helvetica", 14, "bold"))
-        self.style.configure("Stat.TLabel", font=("Helvetica", 10, "bold"))
-        self.style.configure("TNotebook", background="#1e1e1e", borderwidth=0)
-        self.style.configure("TNotebook.Tab", background="#2d2d2d", foreground="#ffffff", font=("Helvetica", 10), padding=(10, 5))
+        self.style.configure(".", background="#f8f9fa", foreground="#1c1c1e")
+        self.style.configure("TLabel", background="#f8f9fa", foreground="#1c1c1e", font=("Helvetica", 10))
+        self.style.configure("TFrame", background="#f8f9fa")
+        self.style.configure("Header.TLabel", font=("Helvetica", 13, "bold"), foreground="#1a73e8", background="#f8f9fa")
+        self.style.configure("Stat.TLabel", font=("Helvetica", 10, "bold"), foreground="#1c1c1e", background="#ffffff")
+        self.style.configure("TLabelframe", background="#ffffff")
+        self.style.configure("TLabelframe.Label", background="#f8f9fa", foreground="#1a73e8", font=("Helvetica", 10, "bold"))
+        self.style.configure("TNotebook", background="#f8f9fa", borderwidth=0)
+        self.style.configure("TNotebook.Tab", background="#e8eaed", foreground="#1c1c1e", font=("Helvetica", 10), padding=(10, 5))
         self.style.map("TNotebook.Tab", background=[("selected", "#1a73e8")], foreground=[("selected", "#ffffff")])
-        self.style.configure("Treeview", background="#2d2d2d", foreground="#ffffff", fieldbackground="#2d2d2d", rowheight=22)
-        self.style.map("Treeview", background=[("selected", "#1a73e8")], foreground=[("selected", "#ffffff")])
+        self.style.configure("Treeview", background="#ffffff", foreground="#1c1c1e", fieldbackground="#ffffff", rowheight=24)
+        self.style.map("Treeview", background=[("selected", "#e8f0fe")], foreground=[("selected", "#1a73e8")])
         
         self._create_widgets()
         self._load_disk_layout()
@@ -63,7 +65,7 @@ class ForensicGui:
         disk_frame = ttk.LabelFrame(self.root, text=" Distribución Física de Particiones (Clic para seleccionar) ", padding=10)
         disk_frame.pack(fill="x", padx=15, pady=5)
         
-        self.disk_canvas = tk.Canvas(disk_frame, height=60, bg="#2d2d2d", highlightthickness=0)
+        self.disk_canvas = tk.Canvas(disk_frame, height=60, bg="#ffffff", highlightthickness=1, highlightbackground="#dadce0")
         self.disk_canvas.pack(fill="x", pady=5)
         self.disk_canvas.bind("<Button-1>", self._on_disk_canvas_click)
         
@@ -125,7 +127,7 @@ class ForensicGui:
         tab_content = ttk.Frame(self.preview_notebook)
         self.preview_notebook.add(tab_content, text=" Contenido (Datos) ")
         
-        self.txt_hexdump = tk.Text(tab_content, font=("Courier New", 9), bg="#1e1e1e", fg="#55ff55", insertbackground="white", highlightthickness=0)
+        self.txt_hexdump = tk.Text(tab_content, font=("Courier New", 9), bg="#ffffff", fg="#1b5e20", insertbackground="#000000", highlightthickness=1, highlightbackground="#dadce0", selectbackground="#c8e6c9", selectforeground="#000000")
         self.txt_hexdump.pack(fill="both", expand=True, side="left")
         scroll_hex = ttk.Scrollbar(tab_content, orient="vertical", command=self.txt_hexdump.yview)
         scroll_hex.pack(fill="y", side="right")
@@ -135,7 +137,7 @@ class ForensicGui:
         tab_structure = ttk.Frame(self.preview_notebook)
         self.preview_notebook.add(tab_structure, text=" Registro de Sistema (Metadatos Crudos) ")
         
-        self.txt_raw_metadata = tk.Text(tab_structure, font=("Courier New", 9), bg="#1e1e1e", fg="#55ffff", insertbackground="white", highlightthickness=0)
+        self.txt_raw_metadata = tk.Text(tab_structure, font=("Courier New", 9), bg="#ffffff", fg="#0d47a1", insertbackground="#000000", highlightthickness=1, highlightbackground="#dadce0", selectbackground="#bbdefb", selectforeground="#000000")
         self.txt_raw_metadata.pack(fill="both", expand=True, side="left")
         scroll_raw = ttk.Scrollbar(tab_structure, orient="vertical", command=self.txt_raw_metadata.yview)
         scroll_raw.pack(fill="y", side="right")
@@ -145,14 +147,18 @@ class ForensicGui:
         tab_text_view = ttk.Frame(self.preview_notebook)
         self.preview_notebook.add(tab_text_view, text=" Vista de Texto ")
         
-        self.txt_text_view = tk.Text(tab_text_view, font=("Courier New", 9), bg="#1e1e1e", fg="#ffffff", insertbackground="white", highlightthickness=0, wrap="char")
+        self.txt_text_view = tk.Text(tab_text_view, font=("Courier New", 9), bg="#ffffff", fg="#212121", insertbackground="#000000", highlightthickness=1, highlightbackground="#dadce0", wrap="char", selectbackground="#e0e0e0", selectforeground="#000000")
         self.txt_text_view.pack(fill="both", expand=True, side="left")
         scroll_text_view = ttk.Scrollbar(tab_text_view, orient="vertical", command=self.txt_text_view.yview)
         scroll_text_view.pack(fill="y", side="right")
         self.txt_text_view.configure(yscrollcommand=scroll_text_view.set)
         
+        # Configurar tags de resaltado de sección en los visores de texto
+        for txt_w in (self.txt_hexdump, self.txt_raw_metadata, self.txt_text_view):
+            txt_w.tag_configure("highlight_entry", background="#fff59d", foreground="#000000")
+        
         # Barra de estado inferior estilo Autopsy
-        self.lbl_hex_status = ttk.Label(self.hex_frame, text="Cursor pos = 0; clus = N/A; log sec = N/A; phy sec = N/A", font=("Courier New", 9, "bold"), relief="sunken", anchor="w", padding=3)
+        self.lbl_hex_status = ttk.Label(self.hex_frame, text="Cursor pos = 0; clus = N/A; log sec = N/A; phy sec = N/A", font=("Courier New", 9, "bold"), relief="sunken", anchor="w", padding=3, background="#e8eaed", foreground="#1c1c1e")
         self.lbl_hex_status.pack(fill="x", side="bottom", pady=(5, 0))
         
         # Eventos para actualizar la posición en tiempo real
@@ -168,7 +174,7 @@ class ForensicGui:
         map_frame = ttk.LabelFrame(self.tab_clusters, text=" Cuadrícula de Clústeres del Volumen ", padding=10)
         map_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         
-        self.cluster_canvas = tk.Canvas(map_frame, bg="#2d2d2d", highlightthickness=0)
+        self.cluster_canvas = tk.Canvas(map_frame, bg="#ffffff", highlightthickness=1, highlightbackground="#dadce0")
         self.cluster_canvas.pack(fill="both", expand=True)
         
         # Panel derecho para estadísticas y leyenda
@@ -593,15 +599,18 @@ class ForensicGui:
         if not node_info:
             return
             
-        self.txt_hexdump.delete("1.0", tk.END)
-        self.txt_raw_metadata.delete("1.0", tk.END)
-        self.txt_text_view.delete("1.0", tk.END)
+        for txt_w in (self.txt_hexdump, self.txt_raw_metadata, self.txt_text_view):
+            txt_w.delete("1.0", tk.END)
+            txt_w.tag_remove("highlight_entry", "1.0", tk.END)
+            
         self.lbl_file_name.config(text="Ningún archivo seleccionado")
         self.lbl_file_meta.config(text="")
         
         if node_info["type"] == "file":
             meta = node_info["meta"]
             self.lbl_file_name.config(text=meta["name"])
+            
+            parser, fs_type, _ = self._get_volume_parser(node_info["part_idx"])
             
             status_str = "BORRADO (Recuperable)" if meta["is_deleted"] else "Activo"
             metadata_text = (
@@ -612,10 +621,11 @@ class ForensicGui:
                 f"Modificación: {meta['modified']}\n"
                 f"Último Acceso: {meta['accessed']}"
             )
-            self.lbl_file_meta.config(text=metadata_text)
+            
+            desglose = self._format_entry_breakdown(fs_type, meta)
+            self.lbl_file_meta.config(text=metadata_text + desglose)
             
             # Cargar vista previa del archivo y metadatos crudos
-            parser, fs_type, _ = self._get_volume_parser(node_info["part_idx"])
             file_bytes = b""
             
             if "NTFS" in fs_type:
@@ -634,6 +644,7 @@ class ForensicGui:
                         f"================================================================================\n\n"
                     )
                     self.txt_raw_metadata.insert("1.0", header + v_dump)
+                    self.txt_raw_metadata.tag_add("highlight_entry", "4.0", tk.END)
                 except:
                     pass
             elif "FAT" in fs_type:
@@ -658,6 +669,7 @@ class ForensicGui:
                             f"================================================================================\n\n"
                         )
                         self.txt_raw_metadata.insert("1.0", header + v_dump)
+                        self.txt_raw_metadata.tag_add("highlight_entry", "4.0", tk.END)
                 except:
                     pass
             elif "Ext4" in fs_type:
@@ -673,6 +685,7 @@ class ForensicGui:
                         f"================================================================================\n\n"
                     )
                     self.txt_raw_metadata.insert("1.0", header + v_dump)
+                    self.txt_raw_metadata.tag_add("highlight_entry", "4.0", tk.END)
                 except:
                     pass
                     
@@ -686,12 +699,22 @@ class ForensicGui:
                 self.txt_hexdump.insert("1.0", "[Sin datos o archivo residente vacío / cifrado]")
                 self.txt_text_view.insert("1.0", "[Sin datos]")
                 
+            self._highlight_item_in_views(meta.get("name", ""))
+                
         elif node_info["type"] == "dir":
             meta = node_info["meta"]
             self.lbl_file_name.config(text=f"Directorio: {meta['name']}")
-            self.lbl_file_meta.config(text=f"ID Lógico: {meta['id']}\nCreación: {meta['created']}\nModificación: {meta['modified']}")
             
             parser, fs_type, _ = self._get_volume_parser(node_info["part_idx"])
+            
+            metadata_text = (
+                f"ID Lógico: {meta['id']}\n"
+                f"Creación: {meta['created']}\n"
+                f"Modificación: {meta['modified']}"
+            )
+            desglose = self._format_entry_breakdown(fs_type, meta)
+            self.lbl_file_meta.config(text=metadata_text + desglose)
+            
             dir_bytes = b""
             
             if "NTFS" in fs_type:
@@ -704,6 +727,7 @@ class ForensicGui:
                         f"================================================================================\n\n"
                     )
                     self.txt_raw_metadata.insert("1.0", header + v_dump)
+                    self.txt_raw_metadata.tag_add("highlight_entry", "4.0", tk.END)
                     dir_bytes = record.raw_data
                 except:
                     pass
@@ -718,6 +742,7 @@ class ForensicGui:
                             f"================================================================================\n\n"
                         )
                         self.txt_raw_metadata.insert("1.0", header + v_dump)
+                        self.txt_raw_metadata.tag_add("highlight_entry", "4.0", tk.END)
                         
                     start_clust = meta["id"]
                     if start_clust > 0:
@@ -743,6 +768,7 @@ class ForensicGui:
                         f"================================================================================\n\n"
                     )
                     self.txt_raw_metadata.insert("1.0", header + v_dump)
+                    self.txt_raw_metadata.tag_add("highlight_entry", "4.0", tk.END)
                     
                     dir_bytes = parser.read_file(meta["id"])[:4096]
                 except:
@@ -756,6 +782,8 @@ class ForensicGui:
             else:
                 self.txt_hexdump.insert("1.0", "[Sin datos o directorio vacío]")
                 self.txt_text_view.insert("1.0", "[Sin datos]")
+                
+            self._highlight_item_in_views(meta.get("name", ""))
             
         elif node_info["type"] == "part":
             self.selected_partition = node_info["part_idx"]
@@ -1156,6 +1184,90 @@ class ForensicGui:
             else:
                 chars.append(".")
         return "".join(chars)
+
+    def _format_entry_breakdown(self, fs_type, meta):
+        raw_b = meta.get("raw_bytes", b"")
+        lines = []
+        
+        if "FAT" in fs_type and raw_b and len(raw_b) >= 32:
+            name_bytes = raw_b[0:11]
+            try:
+                name_83 = name_bytes.decode('latin-1', errors='replace')
+            except:
+                name_83 = str(name_bytes)
+                
+            attr_byte = raw_b[11]
+            attr_list = []
+            if attr_byte & 0x01: attr_list.append("READ_ONLY (0x01)")
+            if attr_byte & 0x02: attr_list.append("HIDDEN (0x02)")
+            if attr_byte & 0x04: attr_list.append("SYSTEM (0x04)")
+            if attr_byte & 0x08: attr_list.append("VOLUME_ID (0x08)")
+            if attr_byte & 0x10: attr_list.append("DIRECTORY (0x10)")
+            if attr_byte & 0x20: attr_list.append("ARCHIVE (0x20)")
+            attr_str = ", ".join(attr_list) if attr_list else "NORMAL (0x00)"
+
+            nt_res = raw_b[12]
+            crt_ms = raw_b[13]
+            crt_t = struct.unpack('<H', raw_b[14:16])[0]
+            crt_d = struct.unpack('<H', raw_b[16:18])[0]
+            acc_d = struct.unpack('<H', raw_b[18:20])[0]
+            c_hi = struct.unpack('<H', raw_b[20:22])[0]
+            mod_t = struct.unpack('<H', raw_b[22:24])[0]
+            mod_d = struct.unpack('<H', raw_b[24:26])[0]
+            c_lo = struct.unpack('<H', raw_b[26:28])[0]
+            f_size = struct.unpack('<I', raw_b[28:32])[0]
+            
+            start_c = (c_hi << 16) | c_lo
+            first_char = raw_b[0]
+            status_txt = "BORRADO (0xE5 - å)" if first_char == 0xE5 else ("LIBRE (0x00)" if first_char == 0x00 else "ACTIVO")
+
+            lines.append("\n" + "─" * 70)
+            lines.append("  DESGLOSE TÉCNICO DE CAMPOS - DIRECTORY ENTRY FAT (32 BYTES):")
+            lines.append("─" * 70)
+            lines.append(f" • [0x00-0x0A] Nombre DOS 8.3       : '{name_83}' (Firma Estado: {status_txt})")
+            lines.append(f" • [0x0B]      Byte de Atributos    : 0x{attr_byte:02X} -> [{attr_str}]")
+            lines.append(f" • [0x0C-0x0D] Reservado NT / CrtMS: 0x{nt_res:02X} / {crt_ms} ms")
+            lines.append(f" • [0x0E-0x11] Fecha/Hora Creación : {meta.get('created', 'N/A')} (T:0x{crt_t:04X}, D:0x{crt_d:04X})")
+            lines.append(f" • [0x12-0x13] Fecha Ult. Acceso   : {meta.get('accessed', 'N/A')} (D:0x{acc_d:04X})")
+            lines.append(f" • [0x14-0x15] Clúster Alto        : 0x{c_hi:04X}")
+            lines.append(f" • [0x16-0x19] Fecha/Hora Modific. : {meta.get('modified', 'N/A')} (T:0x{mod_t:04X}, D:0x{mod_d:04X})")
+            lines.append(f" • [0x1A-0x1B] Clúster Bajo        : 0x{c_lo:04X}  ──► Clúster Inicial Total: {start_c}")
+            lines.append(f" • [0x1C-0x1F] Tamaño en Disco     : {f_size} bytes (0x{f_size:08X})")
+            lines.append("─" * 70)
+        elif "NTFS" in fs_type:
+            lines.append("\n" + "─" * 70)
+            lines.append("  DESGLOSE TÉCNICO DE CAMPO - REGISTRO MFT DE NTFS (1024 BYTES):")
+            lines.append("─" * 70)
+            lines.append(f" • Número de Registro MFT         : {meta.get('id', 'N/A')}")
+            lines.append(f" • Residencia de Atributo $DATA   : {'RESIDENTE EN MFT' if meta.get('is_resident', True) else 'NO RESIDENTE (Data Runs)'}")
+            lines.append(f" • Estado del Registro            : {'BORRADO (Recuperable)' if meta.get('is_deleted') else 'EN USO / ACTIVO'}")
+            lines.append("─" * 70)
+        elif "Ext4" in fs_type:
+            lines.append("\n" + "─" * 70)
+            lines.append("  DESGLOSE TÉCNICO DE CAMPO - INODO EXT4:")
+            lines.append("─" * 70)
+            lines.append(f" • Número de Inodo                : {meta.get('id', 'N/A')}")
+            lines.append(f" • Tamaño Registrado              : {meta.get('size', 0)} bytes")
+            lines.append("─" * 70)
+            
+        return "\n".join(lines)
+
+    def _highlight_item_in_views(self, search_term):
+        if not search_term:
+            return
+        query = search_term.split(".")[0] if "." in search_term else search_term
+        if len(query) < 2:
+            query = search_term
+            
+        for w in (self.txt_hexdump, self.txt_text_view):
+            pos = "1.0"
+            while True:
+                found = w.search(query, pos, stopindex=tk.END, nocase=True)
+                if not found:
+                    break
+                line = found.split(".")[0]
+                w.tag_add("highlight_entry", f"{line}.0", f"{line}.end")
+                pos = f"{int(line)+1}.0"
 
     def run(self):
         self.root.mainloop()
