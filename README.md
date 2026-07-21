@@ -7,23 +7,32 @@
 
 **NTFSForParser** es un framework interactivo desarrollado en Python, diseñado con un enfoque netamente **educativo y pedagógico**. Su objetivo es permitir a los estudiantes de informática forense sumergirse en las profundidades de los sistemas de archivos, entendiendo las estructuras de bajo nivel (hexadecimal), metadatos, y técnicas de recuperación sin depender de interfaces gráficas complejas o cajas negras.
 
-Actualmente soporta análisis profundo sobre particiones **FAT12**, **FAT16**, **FAT32**, **exFAT** y **NTFS**, e inspección base para **Ext4** (Linux), procesando tanto imágenes crudas (`.dd`, `.raw`, fragmentadas `.001`) como imágenes adquiridas en formato **EnCase (`.e01`)**.
+Actualmente soporta análisis profundo sobre particiones **FAT12**, **FAT16**, **FAT32**, **exFAT** y **NTFS**, e inspección base para **Ext4** (Linux), procesando tanto imágenes crudas (`.dd`, `.raw`, fragmentadas `.001`) como imágenes adquiridas en formato **EnCase (`.e01`)** y **dispositivos físicos directos** (`\\.\PhysicalDriveX`, `\\.\C:`).
 
 ---
 
 ## 🚀 Características Principales
 
 1. **Shell Interactivo Forense:** Navega por la imagen de disco utilizando una interfaz de línea de comandos similar a Bash, permitiendo saltar de sector en sector, interpretar clústeres, o moverte por el árbol de directorios de la imagen investigada.
-2. **Soporte MACB Total:** Parseo y extracción nativa de metadatos temporales:
+2. **Interfaz Gráfica Interactiva (GUI Modo Claro Forense):** Visualizador gráfico (estilo Autopsy) desarrollado en Tkinter con diseño Claro/Blanco moderno, barra de particiones físicas responsiva, explorador jerárquico de archivos, previsualizador de datos Hexdump/Texto continuo y mapa interactivo de clústeres.
+3. **Soporte MACB Total:** Parseo y extracción nativa de metadatos temporales:
    - Fechas MS-DOS para entornos FAT12/16/32 y exFAT.
    - Fechas FILETIME (`$STANDARD_INFORMATION`) de 100-nanosegundos para MFT (NTFS).
-3. **Navegación Jerárquica:** El comando `cd` te permite entrar a carpetas y el comando `ls` te muestra el contenido en vivo.
-4. **Data Carving y Recuperación:** Usa el comando `recover` para demostrar la reconstrucción forense a partir de metadatos de archivos borrados: NTFS (reconstrucción completa fragmentada vía Data Runs), exFAT (reconstrucción 100% íntegra si es contiguo vía `NoFatChain` o contigua), y FAT12/16/32 (extracción contigua).
-5. **Comprobación de Integridad Forense Avanzada:** Usa `hash_check` para leer la imagen y verificar hashes. Para E01, extrae y compara hashes MD5/SHA1 internos y realiza comprobaciones de integridad CRC por chunk.
-6. **File Carving Automatizado:** Con soporte para más de 50 firmas de archivos estructurados por categorías usando la técnica de Magic Bytes (configurable en `signatures.conf`).
-7. **Múltiples Formatos Soportados:** Imágenes RAW completas, Divididas/Split (001, 002) y contenedores EnCase (E01).
-8. **Soporte Completo i18n Bilingüe:** 100% del framework traducido (mensajes, errores, parsers y ayuda contextual) a Español e Inglés (inicializable con `--lang en`).
-9. **Ayuda Contextual y Autocompletado**: Menú de ayuda general (`help` o `?`) categorizado, ayuda en caliente de comandos (`<comando> ?`) y autocompletador inteligente para rutas del host local.
+4. **Desglose Didáctico de Campos y Resaltado Hexadecimal:** 
+   - Decodificación detallada de cada campo de las entradas de metadatos (Directory Entries FAT 32-bytes, Registros MFT NTFS 1024-bytes e Inodos Ext4).
+   - Resaltado automático en amarillo (`#fff59d`) de la sección hexadecimal del archivo seleccionado en los visores de previsualización.
+5. **Mapa Visual Interactivo de Clústeres:**
+   - Representación granular con bloques pequeños adaptables y barras de desplazamiento vertical y horizontal.
+   - Reorganización dinámica (*responsive grid*) al cambiar el tamaño de la ventana.
+   - Inspección en tiempo real al hacer clic sobre cualquier clúster: calcula offset físico (disco), LBA, offset relativo (volumen), sector lógico y muestra su volcado binario en caliente.
+6. **Detección Forense de Volúmenes Cifrados:** Identificación automática de volúmenes **BitLocker** (`-FVE-FS-`) con explicación didáctica de por qué los metadatos lógicos están protegidos y qué acciones forenses (carving / sector raw) son posibles.
+7. **Navegación Jerárquica y Explicación VBR:** Navegación por directorios (`cd`/`ls`) y decodificación explicativa del BIOS Parameter Block (VBR) para todos los file systems.
+8. **Data Carving y Recuperación:** Usa el comando `recover` para reconstrucción forense a partir de metadatos de archivos borrados: NTFS (reconstrucción completa fragmentada vía Data Runs), exFAT (reconstrucción íntegra vía `NoFatChain` o cadenas FAT), y FAT12/16/32 (extracción contigua).
+9. **Comprobación de Integridad Forense Avanzada:** Usa `hash_check` para verificar hashes. Para E01, extrae y compara hashes MD5/SHA1 internos y realiza comprobaciones de integridad CRC por chunk.
+10. **File Carving Automatizado:** Soporte para más de 50 firmas de archivos estructurados por categorías usando Magic Bytes (configurable en `signatures.conf`).
+11. **Dispositivos y Múltiples Formatos Soportados:** Imágenes RAW completas, Divididas/Split (`.001`, `.002`), contenedores EnCase (`.e01`) y discos/unidades físicas directas del host (`devices`).
+12. **Soporte Completo i18n Bilingüe:** 100% del framework traducido (mensajes, errores, parsers y ayuda contextual) a Español e Inglés (inicializable con `--lang en`).
+13. **Ayuda Contextual y Autocompletado:** Menú de ayuda general (`help` o `?`) categorizado, ayuda en caliente (`<comando> ?`) y autocompletador inteligente para rutas del host local.
 
 ---
 
@@ -42,12 +51,18 @@ La **única** excepción es la librería para leer el formato propietario E01.
   *(Nota: Esto instalará `libewf-python`, necesario para manejar compresión e indexación de contenedores `.e01`)*
 
 ### 2. Uso y Arranque
-Para arrancar el analizador, simplemente ejecuta `main.py` pasándole la ruta de tu imagen forense.
+Para arrancar el analizador, simplemente ejecuta `main.py` pasándole la ruta de tu imagen forense o dispositivo.
 *(Nota: Si intentas abrir un disco físico `\\.\PhysicalDrive0`, asegúrate de correr tu consola como Administrador).*
 
 ```bash
-# Iniciar el shell interactivo
+# Iniciar el shell interactivo con una imagen E01
 python main.py ruta_a_la_imagen.e01
+
+# Iniciar la interfaz gráfica interactiva (GUI) directamente
+python main.py imagen.dd --gui
+
+# Abrir en modo Verbose explicativo
+python main.py imagen.dd -v
 
 # Ejecución rápida por CLI sin entrar a la shell
 python main.py imagen.dd --part 0 --cluster 500
@@ -62,8 +77,11 @@ python main.py imagen.dd --part 0 --dump-clusters 100 +50 volcado.bin
 
 Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de comandos. Escribe `help` para ver la lista en cualquier momento.
 
-### Gestión de Particiones e Imágenes
-- `partitions`: Lista todas las particiones encontradas en la Tabla de Particiones (MBR).
+### Gestión de Particiones, Dispositivos e Imágenes
+- `gui`: Inicia la **Interfaz Gráfica Interactiva (Tkinter)** con explorador jerárquico de archivos, mapa de clústeres responsivo e inspección de offsets en tiempo real.
+- `devices` (o `open` sin argumentos): Enumera todos los discos físicos (`\\.\PhysicalDriveX`) y unidades lógicas (`\\.\C:`) presentes en el sistema host.
+- `open [-v] <ruta>`: Abre una nueva imagen o disco físico. La bandera `-v` activa el **Modo Verbose Forense**, explicando paso a paso el contenedor, MBR/GPT y firmas.
+- `partitions`: Lista todas las particiones encontradas en la Tabla de Particiones (MBR/GPT).
 - `select <num>`: Activa y monta internamente una de las particiones listadas.
 - `imageinfo`: Imprime todos los metadatos forenses almacenados por el perito si la imagen es un contenedor EnCase (.e01).
 - `hash_check [md5|sha1|sha256|all]`: Verifica la integridad de la imagen cargada. **Para E01**: (1) lee los hashes almacenados en el contenedor (MD5/SHA1), (2) verifica los CRC internos por chunk, (3) calcula los hashes reales y los compara — emitiendo veredicto sobre la cadena de custodia. **Para RAW/DD**: calcula y muestra los hashes sin referencia.
@@ -73,6 +91,7 @@ Una vez dentro de la consola `Forense >`, tienes a tu disposición un arsenal de
 - `hexdump <offset>`: Volcado hexadecimal puro desde el inicio del archivo.
 - `sector <lba>`: Muestra el contenido físico en el LBA (Logical Block Addressing) indicado.
 - `cluster <num>`: Muestra el clúster lógico calculando los offsets relativos a la partición actual.
+- `clustermap`: Renderiza un mapa visual/ASCII de ocupación de clústeres directamente en consola.
 - `go sector <num>` (o `cluster`): Atajo rápido para saltar e inspeccionar un sector o clúster directamente.
 - `identify sector <num>` (o `cluster`): Lee los Magic Bytes y firmas de la cabecera e intenta adivinar qué estructura es (VBR, Registro MFT, Inicio de PDF, Zip, JPEG, etc).
 
@@ -123,14 +142,14 @@ El framework incluye herramientas nativas para simular imágenes de disco GPT co
    ```bash
    python scratch/test_mock_image.py
    ```
-   *(Este test verifica el montaje, lectura de directorios, decodificación de metadatos y recuperación a bajo nivel para todas las particiones del disco de prueba).*
+   *(Este test verifica el montaje, lectura de directorios, decodificación de metadatos, comandos GUI/CLI y recuperación a bajo nivel para todas las particiones del disco de prueba).*
 
 ---
 
 ## 🗺️ Roadmap (Próximas Funcionalidades)
 
 - [ ] Soporte para análisis de particiones APFS / HFS+ (Apple).
-- [ ] Visualizador dinámico de mapas de clústeres ocupados/libres en modo texto en el shell.
+- [x] Visualizador dinámico e interactivo de mapas de clústeres ocupados/libres (GUI + CLI).
 - [ ] Mapeo e interpretación automática de estructuras complejas (Journal JBD2 de Ext4 y transacciones de NTFS).
 - [ ] Generación automática de reportes de hallazgos forenses en formato HTML y PDF.
 
